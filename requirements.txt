@@ -6,3 +6,4 @@ groq
 pynput
 python-dotenv
 google-generativeai
+pyinstaller
