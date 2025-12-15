@@ -1,0 +1,31 @@
+.env
+.env.*
+!.env.example
+!.env.exsmple
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual envs
+.venv/
+.venv_gemini/
+venv/
+
+# Logs
+*.log
+app.log
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
