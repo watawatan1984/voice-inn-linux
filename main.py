@@ -2126,6 +2126,10 @@ class AquaOverlay(QMainWindow):
 
         self._recording_path = None
         self._wave_writer = None
+        self._recording_lock = threading.Lock()
+        self._audio_power_sum = 0.0
+        self._audio_power_count = 0
+        self._audio_peak = 0.0
         self._frames_written = 0
         self._recording_fs = SAMPLE_RATE
         self._max_frames = 0
@@ -2515,6 +2519,40 @@ class AquaOverlay(QMainWindow):
             self._notify("Voice In", "Processing previous audio. Please wait...")
             return
 
+        try:
+            self._stop_check_timer.stop()
+        except Exception:
+            pass
+        self._pending_stop = False
+
+        try:
+            if self.recording_stream:
+                try:
+                    self.recording_stream.stop()
+                except Exception:
+                    pass
+                try:
+                    self.recording_stream.close()
+                except Exception:
+                    pass
+        finally:
+            self.recording_stream = None
+
+        try:
+            with self._recording_lock:
+                w = self._wave_writer
+                self._wave_writer = None
+        except Exception:
+            w = None
+        try:
+            if w:
+                try:
+                    w.close()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
         self._paste_target_window = None
         try:
             if shutil.which("xdotool"):
@@ -2535,6 +2573,9 @@ class AquaOverlay(QMainWindow):
         self.is_recording = True
         self._set_status("recording")
         self._recording_path = None
+        self._audio_power_sum = 0.0
+        self._audio_power_count = 0
+        self._audio_peak = 0.0
         self._frames_written = 0
         self._auto_stop_sent = False
         self.setWindowOpacity(1.0)
@@ -2569,15 +2610,31 @@ class AquaOverlay(QMainWindow):
             gain = float(10 ** (gain_db / 20.0))
 
             try:
-                if not self._wave_writer:
-                    return
-                audio = np.clip(indata * gain, -1.0, 1.0)
-                pcm = (audio * 32767).astype(np.int16)
-                self._wave_writer.writeframesraw(pcm.tobytes())
-                self._frames_written += int(frames)
-                if self._max_frames and self._frames_written >= self._max_frames and not self._auto_stop_sent:
-                    self._auto_stop_sent = True
-                    self._pending_stop = True
+                with self._recording_lock:
+                    w = self._wave_writer
+                    if not w:
+                        return
+                    audio = np.asarray(indata, dtype=np.float32)
+                    audio = np.clip(audio * gain, -1.0, 1.0)
+
+                    try:
+                        peak = float(np.max(np.abs(audio))) if audio.size else 0.0
+                        if peak > self._audio_peak:
+                            self._audio_peak = peak
+                        ss = float(np.sum(audio * audio))
+                        n = int(audio.size)
+                        if n > 0:
+                            self._audio_power_sum += ss
+                            self._audio_power_count += n
+                    except Exception:
+                        pass
+
+                    pcm = (audio * 32767).astype(np.int16)
+                    w.writeframesraw(pcm.tobytes())
+                    self._frames_written += int(frames)
+                    if self._max_frames and self._frames_written >= self._max_frames and not self._auto_stop_sent:
+                        self._auto_stop_sent = True
+                        self._pending_stop = True
             except Exception:
                 if not self._auto_stop_sent:
                     self._auto_stop_sent = True
@@ -2615,16 +2672,28 @@ class AquaOverlay(QMainWindow):
             self._last_error = str(e)
             try:
                 if self.recording_stream:
-                    self.recording_stream.close()
+                    try:
+                        self.recording_stream.stop()
+                    except Exception:
+                        pass
+                    try:
+                        self.recording_stream.close()
+                    except Exception:
+                        pass
             except Exception:
                 pass
             self.recording_stream = None
             try:
-                if self._wave_writer:
-                    self._wave_writer.close()
+                with self._recording_lock:
+                    w = self._wave_writer
+                    self._wave_writer = None
+            except Exception:
+                w = None
+            try:
+                if w:
+                    w.close()
             except Exception:
                 pass
-            self._wave_writer = None
             if self._recording_path and os.path.exists(self._recording_path):
                 try:
                     os.remove(self._recording_path)
@@ -2641,18 +2710,37 @@ class AquaOverlay(QMainWindow):
             self._stop_check_timer.stop()
         except Exception:
             pass
+        self._pending_stop = False
         if self.recording_stream:
-            self.recording_stream.stop()
-            self.recording_stream.close()
+            try:
+                self.recording_stream.stop()
+            except Exception:
+                pass
+            try:
+                self.recording_stream.close()
+            except Exception:
+                pass
         self.recording_stream = None
 
         try:
-            if self._wave_writer:
-                self._wave_writer.close()
+            with self._recording_lock:
+                w = self._wave_writer
+                self._wave_writer = None
+        except Exception:
+            w = None
+        try:
+            if w:
+                w.close()
         except Exception:
             pass
-        self._wave_writer = None
         
+        avg_rms = 0.0
+        try:
+            if self._audio_power_count > 0:
+                avg_rms = float(np.sqrt(self._audio_power_sum / float(self._audio_power_count)))
+        except Exception:
+            avg_rms = 0.0
+
         self.widget.setStyleSheet("""
             QWidget {
                 background-color: rgba(255, 193, 7, 230);
@@ -2665,6 +2753,23 @@ class AquaOverlay(QMainWindow):
 
         wav_path = self._recording_path
         self._recording_path = None
+
+        try:
+            too_short = bool(self._frames_written < int(self._recording_fs * 0.20))
+        except Exception:
+            too_short = False
+
+        is_silence = bool(too_short or (self._audio_peak < 0.02 and avg_rms < 0.005))
+
+        if is_silence:
+            if wav_path and os.path.exists(wav_path):
+                try:
+                    os.remove(wav_path)
+                except Exception:
+                    pass
+            self._notify("Voice In", "No speech detected (silence).")
+            self.reset_ui()
+            return
 
         if not wav_path or not os.path.exists(wav_path) or self._frames_written <= 0:
             if wav_path and os.path.exists(wav_path):
