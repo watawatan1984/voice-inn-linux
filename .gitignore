@@ -18,6 +18,7 @@ build/
 
 # Virtual envs
 .venv/
+.venv_build/
 .venv_gemini/
 venv/
 

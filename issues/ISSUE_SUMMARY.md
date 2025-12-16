@@ -38,6 +38,7 @@
 | [HIST-001](./HIST-001_transcription_history_store_last_50.md) | 文字起こし履歴を過去50件保持（ログ以外の永続化） | ✅ 完了 | 2025-12-16 | history.jsonへ50件保存（atomic write, 破損耐性） |
 | [UI-001](./UI-001_history_browser_dialog.md) | 履歴一覧ダイアログ（検索/コピー/再貼り付け導線） | ✅ 完了 | 2025-12-16 | Historyダイアログ追加（検索/コピー） |
 | [SYNC-001](./SYNC-001_integration_wizard_history_settings.md) | 競合/干渉を避ける統合イシュー（ウィザード×履歴×設定×録音/AI処理） | ✅ 完了 | 2025-12-16 | XDG保存先へ統合、メニュー導線統合 |
+| [BUG-001](./BUG-001_voicein_persistent_idle_i18n_tray_icon.md) | 音声入力後にアプリが終了する問題の修正（常駐維持・トレイ状態色・設定画面の多言語化） | ✅ 完了 | 2025-12-16 | crash.log導入、トレイ状態色、言語切替（ja/en/fr/es/ko） |
 
 ---
 
