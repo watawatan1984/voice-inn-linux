@@ -7,6 +7,7 @@ import threading
 import wave
 from datetime import datetime
 import shutil
+import subprocess
 import traceback
 import faulthandler
 import sounddevice as sd
@@ -1612,33 +1613,65 @@ class SettingsDialog(QDialog):
     def on_test_transcribe(self):
         if not self._test_recorded_chunks:
             return
-        if self._ai_thread and self._ai_thread.isRunning():
-            return
+
+        if self._ai_thread:
+            try:
+                if self._ai_thread.isRunning():
+                    return
+            except RuntimeError:
+                self._ai_thread = None
+                self._ai_worker = None
+            except Exception:
+                pass
 
         full_audio = np.concatenate(self._test_recorded_chunks, axis=0)
         self.txt_test_result.setPlainText("Transcribing...")
 
         prompts = (app_settings or {}).get("prompts", {})
+
+        self._stop_test_ai_thread()
         self._ai_thread = QThread()
+        thr = self._ai_thread
         self._ai_worker = AIWorker(full_audio, self._test_recording_fs, current_provider, prompts, GEMINI_MODEL)
-        self._ai_worker.moveToThread(self._ai_thread)
-        self._ai_thread.started.connect(self._ai_worker.run)
-        self._ai_worker.finished.connect(self._on_test_ai_finished)
-        self._ai_worker.error.connect(self._on_test_ai_error)
-        self._ai_thread.start()
+        worker = self._ai_worker
+        worker.moveToThread(thr)
+        thr.started.connect(worker.run)
+        worker.finished.connect(self._on_test_ai_finished)
+        worker.error.connect(self._on_test_ai_error)
+        worker.finished.connect(thr.quit)
+        worker.error.connect(thr.quit)
+        thr.finished.connect(worker.deleteLater)
+        thr.finished.connect(thr.deleteLater)
+        thr.finished.connect(self._on_test_ai_thread_finished)
+        thr.start()
+
+    def _stop_test_ai_thread(self):
+        t = self._ai_thread
+        if not t:
+            return
+        try:
+            if t.isRunning():
+                t.quit()
+                t.wait()
+        except RuntimeError:
+            pass
+        except Exception:
+            pass
+        self._ai_thread = None
+        self._ai_worker = None
+
+    def _on_test_ai_thread_finished(self):
+        self._ai_thread = None
+        self._ai_worker = None
 
     def _on_test_ai_finished(self, text):
         txt = text or ""
         self.txt_test_result.setPlainText(txt)
-        if self._ai_thread and self._ai_thread.isRunning():
-            self._ai_thread.quit()
-            self._ai_thread.wait()
+        self._stop_test_ai_thread()
 
     def _on_test_ai_error(self, err):
         self.txt_test_result.setPlainText(f"Error: {err}")
-        if self._ai_thread and self._ai_thread.isRunning():
-            self._ai_thread.quit()
-            self._ai_thread.wait()
+        self._stop_test_ai_thread()
 
     def closeEvent(self, event):
         self._stop_mic_test()
@@ -2077,6 +2110,7 @@ class AquaOverlay(QMainWindow):
         self._tray = None
         self._last_text = ""
         self._last_error = ""
+        self._paste_target_window = None
         self._result_dialog = None
         self._history_dialog = None
         self._setup_dialog = None
@@ -2480,6 +2514,24 @@ class AquaOverlay(QMainWindow):
         if self._is_processing:
             self._notify("Voice In", "Processing previous audio. Please wait...")
             return
+
+        self._paste_target_window = None
+        try:
+            if shutil.which("xdotool"):
+                r = subprocess.run(
+                    ["xdotool", "getactivewindow"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                    text=True,
+                )
+                if r.returncode == 0:
+                    wid = (r.stdout or "").strip()
+                    if wid:
+                        self._paste_target_window = wid
+        except Exception:
+            pass
+
         self.is_recording = True
         self._set_status("recording")
         self._recording_path = None
@@ -2626,23 +2678,41 @@ class AquaOverlay(QMainWindow):
         self._is_processing = True
         prompts = (app_settings or {}).get("prompts", {})
 
-        if self._ai_thread and self._ai_thread.isRunning():
-            try:
-                self._ai_thread.quit()
-                self._ai_thread.wait()
-            except Exception:
-                pass
+        self._stop_ai_thread()
 
         self._ai_thread = QThread()
+        thr = self._ai_thread
         self._ai_worker = AIWorker(None, self._recording_fs, current_provider, prompts, GEMINI_MODEL, wav_path=wav_path)
-        self._ai_worker.moveToThread(self._ai_thread)
-        self._ai_thread.started.connect(self._ai_worker.run)
-        self._ai_worker.finished.connect(self.on_ai_finished)
-        self._ai_worker.error.connect(self.on_ai_error)
-        self._ai_worker.finished.connect(self._ai_thread.quit)
-        self._ai_worker.error.connect(self._ai_thread.quit)
-        self._ai_thread.finished.connect(self._ai_thread.deleteLater)
-        self._ai_thread.start()
+        worker = self._ai_worker
+        worker.moveToThread(thr)
+        thr.started.connect(worker.run)
+        worker.finished.connect(self.on_ai_finished)
+        worker.error.connect(self.on_ai_error)
+        worker.finished.connect(thr.quit)
+        worker.error.connect(thr.quit)
+        thr.finished.connect(worker.deleteLater)
+        thr.finished.connect(thr.deleteLater)
+        thr.finished.connect(self._on_ai_thread_finished)
+        thr.start()
+
+    def _stop_ai_thread(self):
+        t = self._ai_thread
+        if not t:
+            return
+        try:
+            if t.isRunning():
+                t.quit()
+                t.wait()
+        except RuntimeError:
+            pass
+        except Exception:
+            pass
+        self._ai_thread = None
+        self._ai_worker = None
+
+    def _on_ai_thread_finished(self):
+        self._ai_thread = None
+        self._ai_worker = None
 
     def on_ai_finished(self, text):
         text = self.apply_dictionary(text)
@@ -2666,6 +2736,44 @@ class AquaOverlay(QMainWindow):
 
             def _do_paste():
                 try:
+                    # Improve reliability: clear modifiers (Alt etc.) then paste.
+                    try:
+                        for k in (
+                            keyboard.Key.alt_l,
+                            keyboard.Key.alt_r,
+                            keyboard.Key.shift,
+                            keyboard.Key.shift_l,
+                            keyboard.Key.shift_r,
+                            keyboard.Key.ctrl,
+                            keyboard.Key.ctrl_l,
+                            keyboard.Key.ctrl_r,
+                            keyboard.Key.cmd,
+                        ):
+                            try:
+                                self.keyboard_controller.release(k)
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+
+                    # Prefer xdotool on X11 if available.
+                    try:
+                        if shutil.which("xdotool"):
+                            cmd = ["xdotool", "key"]
+                            if self._paste_target_window:
+                                cmd += ["--window", str(self._paste_target_window)]
+                            cmd += ["--clearmodifiers", "ctrl+v"]
+                            r = subprocess.run(
+                                cmd,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                check=False,
+                            )
+                            if r.returncode == 0:
+                                return
+                    except Exception:
+                        pass
+
                     with self.keyboard_controller.pressed(keyboard.Key.ctrl):
                         self.keyboard_controller.press('v')
                         self.keyboard_controller.release('v')
@@ -2701,12 +2809,7 @@ class AquaOverlay(QMainWindow):
         self.update_style() # Restore style (border color)
         self.label.setText("🎤")
         self._set_status("idle")
-        if self._ai_thread and self._ai_thread.isRunning():
-            try:
-                self._ai_thread.quit()
-                self._ai_thread.wait()
-            except Exception:
-                pass
+        self._stop_ai_thread()
         self._is_processing = False
 
     def initKeyboard(self):
