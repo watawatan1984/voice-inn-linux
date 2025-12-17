@@ -62,4 +62,4 @@ Voice In は Rust (音声処理コア) と Python (UI/AI統合) で構築され�
 
 ---
 **License**: MIT
-**Author**: [Your Name/Wata]
+**Author**:watawatan1984
