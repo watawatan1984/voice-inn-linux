@@ -1,24 +1,28 @@
-[tool.poetry]
-name = "voice-in"
-version = "0.2.0"
-description = "AI-powered Voice Dictation Tool"
-authors = ["Your Name <your@email.com>"]
-readme = "README.md"
-packages = [{include = "src"}]
-
-[tool.poetry.dependencies]
-python = ">=3.10,<3.13"
-PyQt6 = "6.4.0"
-PyQt6-sip = "^13.4.0"
-sounddevice = "^0.5.0"
-numpy = "^1.26.0"
-scipy = "^1.13.0"
-groq = "0.37.1"
-google-genai = "^0.3.0"
-pynput = "^1.7.0"
-python-dotenv = "^1.0.0"
-faster-whisper = "^1.0.0"
-
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "voice-in"
+version = "0.3.0"
+description = "AI-powered Voice Dictation Tool with Rust Core"
+authors = [{name = "Your Name", email = "your@email.com"}]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "PyQt6>=6.4.0",
+    "PyQt6-sip>=13.4.0",
+    "sounddevice>=0.5.0",
+    "numpy>=1.26.0",
+    "scipy>=1.13.0",
+    "groq>=0.37.1",
+    "google-genai>=0.3.0",
+    "pynput>=1.7.0",
+    "python-dotenv>=1.0.0",
+    "faster-whisper>=1.0.0",
+]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+module-name = "rust_core"
+manifest-path = "rust_core/Cargo.toml"

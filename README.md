@@ -1,104 +1,77 @@
-# Voice In（ミニマムな音声入力アプリ）
+# Voice In (Rust Enhanced)
 
-Linux環境で動作する、ミニマムな音声入力アプリです。
+Linux環境で動作する、高速・安定なミニマム音声入力アプリです。
+コアロジックの一部（録音、VAD、デバイス管理）をRustで再実装し、Python (PyQt6) と統合しました。
+
 `Left Alt` キーを押している間の音声を認識し、AI（Groq Whisper + Llama 3 / Gemini / **Local Whisper**）で文字起こし・整形して、現在アクティブなウィンドウに入力します。
 
-## 最新のアップデート (v0.2.0 - 2024/12)
-- **大規模リファクタリング**: コードベースをモジュール構成 (`src/`) に刷新し、堅牢性と拡張性を向上させました。
-- **Local Whisper 対応**: ローカルでの高速な文字起こし (`faster-whisper`, Large v3 対応) をサポートしました。
-- **環境構築の刷新**: 依存関係管理を **UV + Poetry** に移行し、環境再現性を高めました。
+## 最新のアップデート (v0.3.0)
+- **Rust Core導入**: 音声録音とVAD（無音検知）をRust (`cpal`, `hound`) で再実装し、GILの影響を受けない安定した録音を実現。
+- **デバイス機能強化**: 入力デバイスの正確な選択と、最適なサンプルレートの自動検出をサポート。
+- **ビルドシステムの刷新**: `maturin` を採用し、Rust拡張モジュールのビルドとPythonパッケージ管理を統合。
 
 ## 特徴
-- **選べるAIプロバイダ**: 
-  - **Groq**: 超高速クラウド文字起こし。
-  - **Gemini**: Googleの高精度モデル。
-  - **Local**: ローカルGPU/CPUを使用したプライバシー重視・オフライン対応 (faster-whisper)。
+- **安定した録音**: Rustによるネイティブスレッドでの音声処理。
+- **選べるAIプロバイダ**: Groq, Gemini, Local (faster-whisper)。
+- **マルチプラットフォーム対応**: GitHub Actionsにより Linux, Windows, macOS 用のビルドを自動生成。
 - **高精度な文字起こし**: Whisper Large v3 モデルを使用。
-- **文字起こし後の追加修正（プロンプト）**: 文章の整形やスタイル調整が可能。
-- **AIによる自動整形**: フィラー除去、句読点付与など。
-- **邪魔にならないUI**: オーバーレイUIとトレイアイコンで直感的に操作可能。
 
 ## 動作環境
 - OS: Linux (Ubuntu/Debian系推奨)
-- Python: 3.10以上
-- GUI: X11推奨 (Waylandでは一部機能に制限がある場合があります)
+  - Windows / macOS はCIビルドにて実験的サポート
+- Python: 3.12以上
+- Rust: 最新の安定版 (ビルド時のみ必要)
 
-## セットアップ手順 (UV + Poetry)
+## セットアップ手順
 
-本プロジェクトでは高速なパッケージマネージャ **UV** を推奨しています。
-
-### 1. 前提条件のインストール
+### 1. 必要なツールのインストール (Linux)
 ```bash
-# システムパッケージ (Linux)
+# システムパッケージ (ALSA開発ヘッダ等が必要)
 sudo apt update
-sudo apt install -y python3-pip python3-venv libportaudio2 libxcb-cursor0 libxcb-xinerama0
+sudo apt install -y python3-pip python3-venv libasound2-dev libportaudio2 libxcb-cursor0 libxcb-xinerama0 pkg-config
 
-# UV のインストール (未導入の場合)
+# Rustツールチェーンのインストール
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+
+# UV のインストール
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-### 2. プロジェクトのセットアップ
+### 2. プロジェクトのビルドとセットアップ
 ```bash
-cd /path/to/voice-in
+git clone https://github.com/watawatan1984/voice-inn-linux.git
+cd voice-inn-linux
 
-# 仮想環境の作成と依存関係の同期
-# pyproject.toml に定義されたライブラリが一括でインストールされます
+# 仮想環境作成
 uv venv
+
+# 依存関係インストールとRust拡張のビルド
+# (maturinが自動的にrust_coreをビルドしてインストールします)
+uv pip install maturin
+uv run maturin develop
 uv pip sync pyproject.toml
 ```
 
-Local Whisper を使用する場合、`faster-whisper` も自動的にインストールされます。  
-GPUを使用する場合は、別途 NVIDIA ドライバと CUDA ツールキットの環境が必要です。
-
 ### 3. APIキーの設定
-プロジェクトのルートディレクトリに `.env` ファイルを作成し、使用するプロバイダのキーを設定します。
-（アプリの「Setup Wizard」または「Settings」からも設定可能です）
+`.env` ファイルを作成し、APIキーを設定してください。（`SETUP_UV.md` 参照）
+
+## 実行方法
 
 ```bash
-# .env (例)
-AI_PROVIDER=gemini  # gemini, groq, local
-GEMINI_API_KEY=AIzaSy...
-GROQ_API_KEY=gsk_...
+uv run src/main.py
 ```
+(または `PYTHONPATH=. uv run src/main.py`)
 
-## 使い方
+## マルチプラットフォーム・ビルド
 
-1.  **起動**:
-    作成された仮想環境を使用して起動します。
-    `src` ディレクトリ構成になりましたが、エントリーポイントとして `main.py` を引き続き使用できます。
-
-    ```bash
-    # uv run を使用する場合 (推奨)
-    uv run main.py
-
-    # または直接 python を呼ぶ場合
-    .venv/bin/python main.py
-    ```
-
-    画面にマイクアイコン（🎤）が表示されます。
-
-2.  **音声入力**:
-    - 入力したいテキストボックスをフォーカスします。
-    - **`Left Alt` キーを押し続けて** 話します。
-    - キーを離すと文字起こしが開始されます。
-
-3.  **設定変更**:
-    - トレイアイコンを右クリック → `Settings` または `Setup Wizard` で、AIプロバイダやモデル、音声デバイスを変更できます。
-
-## カスタマイズ
-
-### ログの確認
-ログファイルは `~/.local/state/voice-in/app.log` (Linux標準のXDG Stateディレクトリ) に出力されます。
-また、ターミナルからも標準出力でログを確認できます。
-
-### 辞書登録
-設定画面の `Dictionary` タブから、誤認識しやすい単語の置換ルールを追加・編集できるようになりました。ユーザーによる `main.py` の直接編集は不要です。
+GitHub Actions により、Linux, Windows, macOS 向けの Wheel ファイルが自動的にビルドされます。
+Releases ページからダウンロード可能です。
 
 ## トラブルシューティング
-- **ImportError / ModuleNotFoundError**: 仮想環境が正しく有効化されていないか、インストールが不完全です。 `uv pip sync pyproject.toml` を再実行してください。
-- **Local Whisper が遅い**: CPUで動作している可能性があります。NVIDIA GPUがある場合、`sys.path` にCUDAライブラリが含まれているか確認してください。
-- **起動しない**: `src` ディレクトリが存在し、`main.py` と同じ階層にあることを確認してください。
+- **ビルドエラー (ALSA)**: `libasound2-dev` と `pkg-config` がインストールされているか確認してください。
+- **Rustエラー**: `rustc` のバージョンが古い可能性があります。 `rustup update` を実行してください。
 
 ## 開発者向け
-依存関係を追加する場合は `pyproject.toml` を編集し、再度 `uv pip sync pyproject.toml` を実行してください。
-再現性を保証するため、`setup_uv.md` も参照してください。
+`rust_core/` ディレクトリにRustのソースコードがあります。
+変更を加えた場合は `uv run maturin develop` で再ビルドしてください。
