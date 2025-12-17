@@ -15,7 +15,7 @@ from src.ai.worker import AIWorker
 
 # Reuse audio logic for tests if possible or keep simple inside dialog
 # from src.audio.recorder import open_input_stream_with_fallback, SAMPLE_RATE
-SAMPLE_RATE = 44100
+from src.core.const import SAMPLE_RATE
 
 class SettingsDialog(QDialog):
     # settings_applied signal? 
@@ -390,9 +390,10 @@ class SettingsDialog(QDialog):
         try:
             device = self.cmb_input_device.currentData()
             # Use sounddevice directly for testing since Rust recorder doesn't support callback streaming to Python yet
-            if device is not None and not isinstance(device, int):
-                # Fallback if device is not int (Rust path uses int, SD uses int or str but Config stores int mostly now)
-                pass 
+            # Use sounddevice directly for testing since Rust recorder doesn't support callback streaming to Python yet
+            # if device is not None and not isinstance(device, int):
+            #    # Fallback if device is not int (Rust path uses int, SD uses int or str but Config stores int mostly now)
+            #    pass  
                 
             self._mic_stream = sd.InputStream(
                 device=device,

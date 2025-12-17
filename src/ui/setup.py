@@ -10,7 +10,7 @@ import threading
 
 from src.core.config import config_manager
 # from src.audio.recorder import open_input_stream_with_fallback, SAMPLE_RATE
-SAMPLE_RATE = 44100
+from src.core.const import SAMPLE_RATE
 
 class SetupWizardDialog(QDialog):
     from PyQt6.QtCore import pyqtSignal

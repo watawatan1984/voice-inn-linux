@@ -376,3 +376,5 @@ TRANSLATIONS = {
         "warning_title": "경고",
     },
 }
+
+SAMPLE_RATE = 44100

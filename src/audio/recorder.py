@@ -12,6 +12,7 @@ except ImportError:
     raise
 
 from src.core.config import config_manager
+from src.core.const import SAMPLE_RATE
 
 # Assuming Rust uses default device SR which is typically 44100 or 48000 on modern OS?
 # For PoC we use hardcoded guessed SR for duration calc if Rust doesn't return it.
@@ -25,7 +26,7 @@ class AudioRecorder:
         self._stop_event = threading.Event()
         self.is_recording = False
         self.on_auto_stop = None
-        self.sample_rate = 44100 # Default fallback
+        self.sample_rate = SAMPLE_RATE # Default fallback
 
     def start(self, max_seconds=60, on_auto_stop=None):
         if self.is_recording:
