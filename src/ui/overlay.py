@@ -261,9 +261,18 @@ class AquaOverlay(QMainWindow):
                 print(f"DEBUG: Clipboard content before paste: '{cb_text}'")
                 
                 if shutil.which("xdotool") and self._paste_target_window:
-                     print("DEBUG: Executing xdotool paste")
-                     r1 = subprocess.run(["xdotool", "windowactivate", "--sync", self._paste_target_window], capture_output=True, text=True)
-                     print(f"DEBUG: activate ret={r1.returncode}, err={r1.stderr}")
+                     # Check if we really need to activate (avoid redundant focus events that might reset cursor)
+                     active_now = subprocess.run(["xdotool", "getactivewindow"], capture_output=True, text=True).stdout.strip()
+                     if active_now != self._paste_target_window:
+                         print(f"DEBUG: Activating window (Current: {active_now} != Target: {self._paste_target_window})")
+                         r1 = subprocess.run(["xdotool", "windowactivate", "--sync", self._paste_target_window], capture_output=True, text=True)
+                         print(f"DEBUG: activate ret={r1.returncode}, err={r1.stderr}")
+                     else:
+                         print("DEBUG: Window already active, skipping activate")
+                         
+                     # Force a small sleep to ensure modifiers are clear and focus is stable
+                     # time.sleep(0.1) -> handled by QTimer delay usually, but maybe helpful?
+                     
                      r2 = subprocess.run(["xdotool", "key", "--clearmodifiers", "ctrl+v"], capture_output=True, text=True)
                      print(f"DEBUG: key ret={r2.returncode}, err={r2.stderr}")
                 else:
