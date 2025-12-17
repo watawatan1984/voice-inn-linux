@@ -48,9 +48,33 @@ Voice In은 PC의 모든 애플리케이션에서 사용할 수 있는 차세대
 
 트레이 아이콘을 우클릭하여 `Settings`를 열면 더 많은 설정이 가능합니다.
 
-- **VAD 설정**: 목소리 감지 민감도를 조절할 수 있습니다.
-- **프롬프트 편집**: AI에게 "영어로 번역해줘", "요약해줘" 등의 지시를 내릴 수 있습니다.
-- **사용자 사전**: 자주 쓰는 전문 용어나 이름을 등록하여 인식률을 높일 수 있습니다.
+**Language (언어)**: 앱 언어 변경.
+
+### 1. General (일반 설정)
+기본 동작 환경 설정.
+- **AI Provider**: `Groq` (초고속), `Gemini` (고정확도), `Local` (로컬 처리/오프라인).
+- **Gemini Model / Groq API Key**: 키/모델 입력.
+- **Input Device**: 마이크 선택.
+- **Input Gain**: 입력 게인 (dB).
+- **Hold Key**: 녹음 키 (기본: `Left Alt`).
+- **Max Recording**: 최대 녹음 시간.
+- **Min Valid Duration**: 최소 유효 시간.
+- **Auto Paste**: 자동 붙여넣기 (ON/OFF).
+- **Paste Delay**: 붙여넣기 지연 (ms).
+
+### 2. Prompts (프롬프트)
+AI 지시 사항 사용자 정의.
+- **Groq Whisper Prompt**: 인식 힌트 (예: "의학 용어").
+- **Refine System Prompt**: 텍스트 후처리 규칙 (예: "영어로 번역해").
+
+### 3. Dictionary (사전)
+- **From**: 오인식된 단어.
+- **To**: 올바른 단어.
+
+### 4. Local Whisper
+- **Model Size**: 모델 크기 (`large-v3` 등).
+- **Device**: `cuda` (GPU) 또는 `cpu`.
+- **Compute Type**: 계산 정밀도 (`float16`, `int8`).
 
 ---
 

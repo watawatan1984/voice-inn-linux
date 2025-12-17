@@ -48,9 +48,33 @@ Voice In 是一款适用于 PC 上所有应用程序的新一代 AI 语音输入
 
 右键单击托盘图标并选择 `Settings` 以获取更多选项：
 
-- **VAD 设置**: 调整语音检测的灵敏度。
-- **提示词工程 (Prompt)**: 指示 AI “翻译成英文” 或 “总结为要点”。
-- **词典**: 添加自定义词汇或专业术语以提高识别率。
+**Language (界面语言)**: 切换应用程序语言。
+
+### 1. General (常规设置)
+基本运行环境设置。
+- **AI Provider**: `Groq` (超快), `Gemini` (高精度), `Local` (本地隐私/离线)。
+- **Gemini Model / Groq API Key**: 输入密钥/模型。
+- **Input Device**: 选择麦克风。
+- **Input Gain**: 麦克风增益 (dB)。
+- **Hold Key**: 录音按键 (默认: `Left Alt`)。
+- **Max Recording**: 最大录音时长（秒）。
+- **Min Valid Duration**: 最短有效录音时长。
+- **Auto Paste**: 自动粘贴 (ON/OFF)。
+- **Paste Delay**: 粘贴延迟 (ms)。
+
+### 2. Prompts (提示词)
+自定义 AI 指令。
+- **Groq Whisper Prompt**: 语音识别提示（例如：“医学术语”）。
+- **Refine System Prompt**: 文本润色规则（例如：“翻译成英文”）。
+
+### 3. Dictionary (词典)
+- **From**: 错误识别的词。
+- **To**: 正确的词。
+
+### 4. Local Whisper
+- **Model Size**: 模型大小 (`large-v3`, `base` 等)。
+- **Device**: `cuda` (GPU) 或 `cpu`。
+- **Compute Type**: 计算精度 (`float16`, `int8`)。
 
 ---
 

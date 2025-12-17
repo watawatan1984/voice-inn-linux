@@ -48,9 +48,33 @@ C'est extrêmement simple.
 
 Faites un clic droit sur l'icône dans la barre d'état système et sélectionnez `Settings` pour plus d'options :
 
-- **Réglages VAD** : Ajustez la sensibilité de la détection vocale.
-- **Prompt Engineering** : Donnez des instructions à l'IA comme "traduire en anglais" ou "résumer en puces".
-- **Dictionnaire** : Ajoutez des mots personnalisés ou des termes techniques pour une meilleure reconnaissance.
+**Language (Langue)** : Changer la langue de l'interface.
+
+### 1. General (Général)
+Configuration de base.
+- **AI Provider** : `Groq` (Ultra-rapide), `Gemini` (Haute précision), `Local` (Confidentialité/Hors ligne).
+- **Gemini Model / Groq API Key** : Clé API/Modèle.
+- **Input Device** : Microphone.
+- **Input Gain** : Gain d'entrée (dB).
+- **Hold Key** : Touche d'enregistrement (Défaut : `Left Alt`).
+- **Max Recording** : Durée max d'enregistrement.
+- **Min Valid Duration** : Durée min valide.
+- **Auto Paste** : Collage automatique (ON/OFF).
+- **Paste Delay** : Délai de collage (ms).
+
+### 2. Prompts
+Personnaliser les instructions IA.
+- **Groq Whisper Prompt** : Indices de contexte (ex: "Termes médicaux").
+- **Refine System Prompt** : Règles de formatage (ex: "Traduire en anglais").
+
+### 3. Dictionary (Dictionnaire)
+- **From** : Mot incorrect.
+- **To** : Mot correct.
+
+### 4. Local Whisper
+- **Model Size** : Taille du modèle (`large-v3`, etc.).
+- **Device** : `cuda` (GPU) ou `cpu`.
+- **Compute Type** : Précision (`float16`, `int8`).
 
 ---
 
