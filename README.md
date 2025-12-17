@@ -1,77 +1,65 @@
-# Voice In (Rust Enhanced)
+# Voice In (ボイス・イン)
 
-Linux環境で動作する、高速・安定なミニマム音声入力アプリです。
-コアロジックの一部（録音、VAD、デバイス管理）をRustで再実装し、Python (PyQt6) と統合しました。
+**あなたの声を、あらゆる場所でテキストに。**
 
-`Left Alt` キーを押している間の音声を認識し、AI（Groq Whisper + Llama 3 / Gemini / **Local Whisper**）で文字起こし・整形して、現在アクティブなウィンドウに入力します。
+Voice In は、PC上のあらゆるアプリケーションで使える、AI搭載の次世代音声入力ツールです。
+キーを押し続けて話すだけ。最新のAIがあなたの言葉を理解し、句読点の追加や文法修正を行い、完璧な文章として入力します。
 
-## 最新のアップデート (v0.3.0)
-- **Rust Core導入**: 音声録音とVAD（無音検知）をRust (`cpal`, `hound`) で再実装し、GILの影響を受けない安定した録音を実現。
-- **デバイス機能強化**: 入力デバイスの正確な選択と、最適なサンプルレートの自動検出をサポート。
-- **ビルドシステムの刷新**: `maturin` を採用し、Rust拡張モジュールのビルドとPythonパッケージ管理を統合。
+[English](docs/README_en.md) | [한국어](docs/README_kr.md) | [中文](docs/README_zh.md) | [Français](docs/README_fr.md)
 
-## 特徴
-- **安定した録音**: Rustによるネイティブスレッドでの音声処理。
-- **選べるAIプロバイダ**: Groq, Gemini, Local (faster-whisper)。
-- **マルチプラットフォーム対応**: GitHub Actionsにより Linux, Windows, macOS 用のビルドを自動生成。
-- **高精度な文字起こし**: Whisper Large v3 モデルを使用。
+---
 
-## 動作環境
-- OS: Linux (Ubuntu/Debian系推奨)
-  - Windows / macOS はCIビルドにて実験的サポート
-- Python: 3.12以上
-- Rust: 最新の安定版 (ビルド時のみ必要)
+## ✨ なぜ Voice In なのか？
 
-## セットアップ手順
+- **どこでも入力**: メモ帳、ブラウザ、Slack、コーディングエディタ... アクティブなウィンドウならどこでも入力可能です。
+- **ただの文字起こしではありません**: "えーっと" などの不要な言葉を取り除き、文脈に合わせて「です・ます」調や箇条書きなどに自動で整形します。
+- **選べるAI**: 最新のクラウドAI（Groq, Google Gemini）による超高速・高精度な認識に加え、プライバシー重視のローカル処理（Local Whisper）も選択可能です。
+- **クロスプラットフォーム**: Linux をメインに、Windows や macOS でも動作します。
 
-### 1. 必要なツールのインストール (Linux)
-```bash
-# システムパッケージ (ALSA開発ヘッダ等が必要)
-sudo apt update
-sudo apt install -y python3-pip python3-venv libasound2-dev libportaudio2 libxcb-cursor0 libxcb-xinerama0 pkg-config
+## 🚀 はじめ方
 
-# Rustツールチェーンのインストール
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source $HOME/.cargo/env
+### 1. ダウンロード
+右側の [Releases](https://github.com/watawatan1984/voice-inn-linux/releases) ページから、お使いのOSに合った最新のファイルをダウンロードしてください。
 
-# UV のインストール
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
+### 2. インストールと起動
+ダウンロードしたファイルを実行するか、以下のコマンド（上級者向け）でセットアップします。
 
-### 2. プロジェクトのビルドとセットアップ
-```bash
-git clone https://github.com/watawatan1984/voice-inn-linux.git
-cd voice-inn-linux
+> **初心者の方へ**: 多くのLinux環境では、ダウンロードしたファイルを実行権限付きで起動するだけで使えます。
 
-# 仮想環境作成
-uv venv
+### 3. 設定 (Setup Wizard)
+初回起動時にセットアップウィザードが開きます。
+1. **AIプロバイダ**: 高速な `Groq`、高精度な `Gemini`、またはオフラインの `Local` から選びます。
+2. **APIキー**: クラウドAIを使用する場合は、無料のAPIキーを取得して入力してください。
+3. **マイク選択**: 使用するマイクを選び、テストします。
 
-# 依存関係インストールとRust拡張のビルド
-# (maturinが自動的にrust_coreをビルドしてインストールします)
-uv pip install maturin
-uv run maturin develop
-uv pip sync pyproject.toml
-```
+## 🎙️ 使い方
 
-### 3. APIキーの設定
-`.env` ファイルを作成し、APIキーを設定してください。（`SETUP_UV.md` 参照）
+使い方はとてもシンプルです。
 
-## 実行方法
+1. 文字を入力したい場所（テキストボックスなど）をクリックします。
+2. **`Left Alt` キー（または設定したキー）を押し続けます**。
+3. マイクに向かって話します。「マイクアイコン」が画面に表示されます。
+4. 話し終わったらキーを離します。
+5. AIが文章を整え、自動的に入力されます ✨
 
-```bash
-uv run src/main.py
-```
-(または `PYTHONPATH=. uv run src/main.py`)
+---
 
-## マルチプラットフォーム・ビルド
+## ⚙️ 詳細設定とカスタマイズ
 
-GitHub Actions により、Linux, Windows, macOS 向けの Wheel ファイルが自動的にビルドされます。
-Releases ページからダウンロード可能です。
+タスクトレイのアイコンを右クリックして `Settings` を開くと、より詳細な設定が可能です。
 
-## トラブルシューティング
-- **ビルドエラー (ALSA)**: `libasound2-dev` と `pkg-config` がインストールされているか確認してください。
-- **Rustエラー**: `rustc` のバージョンが古い可能性があります。 `rustup update` を実行してください。
+- **VAD設定**: 話し始めや話し終わりの感度を調整できます。
+- **プロンプト編集**: AIに「関西弁で」や「英語に翻訳して」などの指示を与えることができます。
+- **辞書登録**: よく使う専門用語や名前を正しく認識させることができます。
 
-## 開発者向け
-`rust_core/` ディレクトリにRustのソースコードがあります。
-変更を加えた場合は `uv run maturin develop` で再ビルドしてください。
+---
+
+## 🛠️ 開発者向け情報 (Technical Details)
+
+技術的な詳細や、ソースコードからのビルド方法は [DEVELOPMENT.md](docs/DEVELOPMENT.md) をご覧ください。
+
+Voice In は Rust (音声処理コア) と Python (UI/AI統合) で構築されており、オープンソースとして開発されています。
+
+---
+**License**: MIT
+**Author**: [Your Name/Wata]
