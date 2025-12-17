@@ -5,7 +5,7 @@
 Voice In est un outil de dictée vocale de nouvelle génération, alimenté par l'IA, qui fonctionne dans n'importe quelle application sur votre PC.
 Il suffit de maintenir la touche enfoncée et de parler. L'IA avancée comprend votre contexte, ajoute la ponctuation, corrige la grammaire et saisit un texte parfait instantanément.
 
-[日本語](../README.md) | [English](README_en.md) | [한국어](README_kr.md) | [中文](README_zh.md)
+[日本語](../README.md) | [English](README_en.md) | [한국어](README_ko.md) | [中文](README_zh.md)
 
 ---
 

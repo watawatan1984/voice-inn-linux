@@ -5,7 +5,7 @@
 Voice In は、PC上のあらゆるアプリケーションで使える、AI搭載の次世代音声入力ツールです。
 キーを押し続けて話すだけ。最新のAIがあなたの言葉を理解し、句読点の追加や文法修正を行い、完璧な文章として入力します。
 
-[English](docs/README_en.md) | [한국어](docs/README_kr.md) | [中文](docs/README_zh.md) | [Français](docs/README_fr.md)
+[English](docs/README_en.md) | [한국어](docs/README_ko.md) | [中文](docs/README_zh.md) | [Français](docs/README_fr.md)
 
 ---
 

@@ -5,7 +5,7 @@
 Voice In is a next-generation AI-powered voice dictation tool that works in any application on your PC.
 Just hold the key and speak. Advanced AI understands your context, adds punctuation, fixes grammar, and types out perfect text instantly.
 
-[日本語](../README.md) | [한국어](README_kr.md) | [中文](README_zh.md) | [Français](README_fr.md)
+[日本語](../README.md) | [한국어](README_ko.md) | [中文](README_zh.md) | [Français](README_fr.md)
 
 ---
 

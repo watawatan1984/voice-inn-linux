@@ -5,7 +5,7 @@
 Voice In 是一款适用于 PC 上所有应用程序的新一代 AI 语音输入工具。
 只需按住按键并说话。先进的 AI 能够理解您的语境，自动添加标点符号，修正语法，并即时输入完美的文本。
 
-[日本語](../README.md) | [English](README_en.md) | [한국어](README_kr.md) | [Français](README_fr.md)
+[日本語](../README.md) | [English](README_en.md) | [한국어](README_ko.md) | [Français](README_fr.md)
 
 ---
 
