@@ -2553,22 +2553,22 @@ class AquaOverlay(QMainWindow):
         except Exception:
             pass
 
-        self._paste_target_window = None
-        try:
-            if shutil.which("xdotool"):
-                r = subprocess.run(
-                    ["xdotool", "getactivewindow"],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.DEVNULL,
-                    check=False,
-                    text=True,
-                )
-                if r.returncode == 0:
-                    wid = (r.stdout or "").strip()
-                    if wid:
-                        self._paste_target_window = wid
-        except Exception:
-            pass
+        if not self._paste_target_window:
+            try:
+                if shutil.which("xdotool"):
+                    r = subprocess.run(
+                        ["xdotool", "getactivewindow"],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.DEVNULL,
+                        check=False,
+                        text=True,
+                    )
+                    if r.returncode == 0:
+                        wid = (r.stdout or "").strip()
+                        if wid:
+                            self._paste_target_window = wid
+            except Exception:
+                pass
 
         self.is_recording = True
         self._set_status("recording")
@@ -2841,6 +2841,7 @@ class AquaOverlay(QMainWindow):
 
             def _do_paste():
                 try:
+                    logging.info("Starting auto-paste sequence...")
                     # Improve reliability: clear modifiers (Alt etc.) then paste.
                     try:
                         for k in (
@@ -2862,12 +2863,28 @@ class AquaOverlay(QMainWindow):
                         pass
 
                     # Prefer xdotool on X11 if available.
+                    xdotool_success = False
                     try:
                         if shutil.which("xdotool"):
+                            logging.info("xdotool found. Attempting xdotool paste.")
+                            try:
+                                if self._paste_target_window:
+                                    logging.info(f"Activating window: {self._paste_target_window}")
+                                    subprocess.run(
+                                        ["xdotool", "windowactivate", "--sync", str(self._paste_target_window)],
+                                        stdout=subprocess.DEVNULL,
+                                        stderr=subprocess.DEVNULL,
+                                        check=False,
+                                    )
+                            except Exception as e:
+                                logging.warning(f"Failed to activate window with xdotool: {e}")
+
                             cmd = ["xdotool", "key"]
                             if self._paste_target_window:
                                 cmd += ["--window", str(self._paste_target_window)]
                             cmd += ["--clearmodifiers", "ctrl+v"]
+                            
+                            logging.info(f"Running xdotool command: {cmd}")
                             r = subprocess.run(
                                 cmd,
                                 stdout=subprocess.DEVNULL,
@@ -2875,14 +2892,23 @@ class AquaOverlay(QMainWindow):
                                 check=False,
                             )
                             if r.returncode == 0:
-                                return
-                    except Exception:
-                        pass
+                                logging.info("xdotool paste command succeeded.")
+                                xdotool_success = True
+                            else:
+                                logging.warning(f"xdotool exited with code {r.returncode}, falling back to pynput.")
+                    except Exception as e:
+                        logging.warning(f"xdotool execution failed: {e}")
+                    
+                    if xdotool_success:
+                        return
 
+                    logging.info("Falling back to pynput paste.")
                     with self.keyboard_controller.pressed(keyboard.Key.ctrl):
                         self.keyboard_controller.press('v')
                         self.keyboard_controller.release('v')
+                    logging.info("pynput paste completed.")
                 except Exception as e:
+                    logging.error(f"Auto paste failed completely: {e}")
                     self._notify("Voice In", f"Auto paste failed. Open 'Show Last Result...': {e}")
 
             if auto_paste:
@@ -2934,6 +2960,22 @@ class AquaOverlay(QMainWindow):
 
     def on_key_press(self, key):
         if key == self._configured_hold_key():
+            self._paste_target_window = None
+            try:
+                if shutil.which("xdotool"):
+                    r = subprocess.run(
+                        ["xdotool", "getactivewindow"],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.DEVNULL,
+                        check=False,
+                        text=True,
+                    )
+                    if r.returncode == 0:
+                        wid = (r.stdout or "").strip()
+                        if wid:
+                            self._paste_target_window = wid
+            except Exception:
+                pass
             self.start_recording_signal.emit()
 
     def on_key_release(self, key):
