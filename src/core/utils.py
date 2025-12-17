@@ -5,11 +5,8 @@ from datetime import datetime
 def get_app_dir():
     if getattr(sys, 'frozen', False):
         return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.abspath(__file__)).split('src')[0] # Adjust for src depth if needed, or better:
-    # If this file is in src/core/utils.py, app dir is ../../
-    # But original code used `__file__` of main.py.
-    # Let's keep it robust. If frozen, it's executable dir.
-    # If not frozen, it's the root of the repo.
+    # Using src/core/utils.py depth to resolve root
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def _xdg_home(env_key: str, fallback_path: str) -> str:
     return os.path.expanduser(os.getenv(env_key) or fallback_path)

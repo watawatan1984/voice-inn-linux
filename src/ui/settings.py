@@ -107,6 +107,11 @@ class SettingsDialog(QDialog):
         self.spn_max_record_seconds.setRange(5, 600)
         self.spn_max_record_seconds.setSuffix(" s")
         
+        self.spn_min_duration = QDoubleSpinBox()
+        self.spn_min_duration.setRange(0.2, 5.0)
+        self.spn_min_duration.setSingleStep(0.1)
+        self.spn_min_duration.setSuffix(" s")
+        
         self.chk_auto_paste = QCheckBox(t("label_auto_paste"))
         self.spn_paste_delay_ms = QSpinBox()
         self.spn_paste_delay_ms.setRange(0, 1000)
@@ -128,6 +133,7 @@ class SettingsDialog(QDialog):
         form.addRow(t("label_input_gain"), self.spn_input_gain_db)
         form.addRow(t("label_hold_key"), self.cmb_hold_key)
         form.addRow(t("label_max_recording"), self.spn_max_record_seconds)
+        form.addRow(t("label_min_duration"), self.spn_min_duration)
         form.addRow(t("label_auto_paste"), self.chk_auto_paste)
         form.addRow(t("label_paste_delay"), self.spn_paste_delay_ms)
         form.addRow(t("label_language"), self.cmb_language)
@@ -238,6 +244,7 @@ class SettingsDialog(QDialog):
         audio = settings.get("audio", {})
         self.spn_input_gain_db.setValue(float(audio.get("input_gain_db", 0.0)))
         self.spn_max_record_seconds.setValue(int(audio.get("max_record_seconds", 60)))
+        self.spn_min_duration.setValue(float(audio.get("min_duration", 0.2)))
         self.chk_auto_paste.setChecked(bool(audio.get("auto_paste", True)))
         self.spn_paste_delay_ms.setValue(int(audio.get("paste_delay_ms", 60)))
         
@@ -328,12 +335,14 @@ class SettingsDialog(QDialog):
             
         new_settings = {
             "audio": {
-                "input_device": self.cmb_input_device.currentData(),
                 "input_gain_db": self.spn_input_gain_db.value(),
                 "max_record_seconds": self.spn_max_record_seconds.value(),
+                "min_duration": self.spn_min_duration.value(),
                 "auto_paste": self.chk_auto_paste.isChecked(),
                 "paste_delay_ms": self.spn_paste_delay_ms.value(),
-                "hold_key": self.cmb_hold_key.currentData()
+                # keep legacy or hidden values
+                "hold_key": self.cmb_hold_key.currentData(),
+                "input_device": self.cmb_input_device.currentData(),
             },
             "ui": {
                 "language": self.cmb_language.currentData()
@@ -419,6 +428,8 @@ class SettingsDialog(QDialog):
         self.btn_test_stop.setEnabled(False)
         self.btn_test_transcribe.setEnabled(True)
 
+    # ... (previous methods)
+
     def on_test_transcribe(self):
         if not self._test_recorded_chunks: return
         import wave
@@ -430,7 +441,11 @@ class SettingsDialog(QDialog):
         mx = np.max(np.abs(full_audio))
         if mx > 0: full_audio = full_audio / mx
         
+        # Cleanup previous temp file if exists? 
+        # In this scope we create a new one. cleanup logic should be in worker or here after done.
+        
         tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        self._test_temp_path = tmp.name # Keep reference
         with wave.open(tmp.name, "wb") as w:
             w.setnchannels(1)
             w.setsampwidth(2)
@@ -440,7 +455,8 @@ class SettingsDialog(QDialog):
         provider = self.cmb_provider.currentText()
         prompts = config_manager.settings.get("prompts", {})
         
-        self.txt_test_result.setPlainText("Transcribing...")
+        self.txt_test_result.setPlainText(t("tests_transcribing"))
+        self.btn_test_transcribe.setEnabled(False)
         
         self._ai_thread = QThread()
         self._ai_worker = AIWorker(provider, tmp.name, prompts)
@@ -448,10 +464,26 @@ class SettingsDialog(QDialog):
         self._ai_thread.started.connect(self._ai_worker.run)
         self._ai_worker.finished.connect(self._on_test_finished)
         self._ai_worker.error.connect(self._on_test_error)
+        # Cleanup thread
         self._ai_worker.finished.connect(self._ai_thread.quit)
         self._ai_worker.error.connect(self._ai_thread.quit)
+        self._ai_worker.finished.connect(self._ai_worker.deleteLater)
+        self._ai_thread.finished.connect(self._ai_thread.deleteLater)
+        # Cleanup temp file
+        self._ai_worker.finished.connect(lambda: self._cleanup_test_file())
+        self._ai_worker.error.connect(lambda: self._cleanup_test_file())
+        
         self._ai_thread.start()
         
+    def _cleanup_test_file(self):
+        if hasattr(self, '_test_temp_path') and self._test_temp_path and os.path.exists(self._test_temp_path):
+            try:
+                os.remove(self._test_temp_path)
+            except Exception:
+                pass
+            self._test_temp_path = None
+        self.btn_test_transcribe.setEnabled(True)
+
     def _on_test_finished(self, text):
         self.txt_test_result.setPlainText(text)
         
@@ -461,5 +493,6 @@ class SettingsDialog(QDialog):
     def closeEvent(self, event):
         self._stop_mic_test()
         self.on_test_stop_recording()
+        self._cleanup_test_file() # Ensure cleanup on close
         event.accept()
 

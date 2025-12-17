@@ -61,9 +61,11 @@ DEFAULT_SETTINGS = {
     }
 }
 
+import copy
+
 class ConfigManager:
     def __init__(self):
-        self.settings = dict(DEFAULT_SETTINGS)
+        self.settings = copy.deepcopy(DEFAULT_SETTINGS)
         self.ensure_dirs()
         self.load_env()
         self.load_settings()
@@ -88,7 +90,7 @@ class ConfigManager:
 
     def load_settings(self):
         if not os.path.exists(SETTINGS_PATH):
-            self.settings = dict(DEFAULT_SETTINGS)
+            self.settings = copy.deepcopy(DEFAULT_SETTINGS)
             return
         try:
             with open(SETTINGS_PATH, 'r', encoding='utf-8') as f:
@@ -96,7 +98,7 @@ class ConfigManager:
             self.settings = deep_merge_dict(DEFAULT_SETTINGS, data)
         except Exception as e:
             logging.error(f"Failed to load settings.json: {e}")
-            self.settings = dict(DEFAULT_SETTINGS)
+            self.settings = copy.deepcopy(DEFAULT_SETTINGS)
 
     def save_settings(self):
         try:

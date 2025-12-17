@@ -118,9 +118,8 @@ class AudioRecorder:
                     if self.max_frames and self.frames_written >= self.max_frames and not self.auto_stop_sent:
                         self.auto_stop_sent = True
                         if self.on_auto_stop:
-                            # Execute via timer or separate thread? 
-                            # Callback is in audio thread, better not call complex things here.
-                            # We'll set a flag or use a light callback that signals UI thread.
+                            # Use a thread-safe flag or expect callback to be safe.
+                            # Calling simple lambda which emits signal is safe in Qt if queued.
                             self.on_auto_stop()
             except Exception:
                 pass
@@ -149,7 +148,7 @@ class AudioRecorder:
         except Exception as e:
             logging.error(f"Failed to start recording: {e}")
             self.cleanup()
-            raise e
+            raise RuntimeError("Failed to start recording") from e
 
     def stop(self):
         if not self.is_recording:
@@ -184,11 +183,17 @@ class AudioRecorder:
         self._recording_path = None
 
     def get_stats(self):
+        with self._recording_lock:
+            peak = self.audio_peak
+            s = self.audio_power_sum
+            c = self.audio_power_count
+            fw = self.frames_written
+        
         avg_rms = 0.0
-        if self.audio_power_count > 0:
-            avg_rms = float(np.sqrt(self.audio_power_sum / float(self.audio_power_count)))
+        if c > 0:
+            avg_rms = float(np.sqrt(s / float(c)))
         return {
-            "peak": self.audio_peak,
+            "peak": peak,
             "avg_rms": avg_rms,
-            "duration": self.frames_written / self.fs if self.fs else 0
+            "duration": fw / self.fs if self.fs else 0
         }

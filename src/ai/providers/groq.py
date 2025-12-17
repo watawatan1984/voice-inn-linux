@@ -9,6 +9,8 @@ class GroqProvider(AIProvider):
         self.client = None
         if self.api_key:
             try:
+                # Groq client does not support 'proxies' arg directly in some versions or it's handled differently.
+                # Since we don't have proxy settings, just remove it.
                 self.client = Groq(api_key=self.api_key)
             except Exception as e:
                 print(f"Error initializing Groq client: {e}")

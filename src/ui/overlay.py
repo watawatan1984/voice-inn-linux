@@ -58,9 +58,9 @@ class AquaOverlay(QMainWindow):
         # I added `on_auto_stop`.
         
     def initUI(self):
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.ToolTip | Qt.WindowType.WindowDoesNotAcceptFocus)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         
         screen = QApplication.primaryScreen().availableGeometry()
         size = 60
@@ -132,6 +132,11 @@ class AquaOverlay(QMainWindow):
             }}
         """)
         
+        # Apply audio settings to VAD/Recorder if needed
+        min_dur = float(config_manager.settings.get("audio", {}).get("min_duration", 0.2))
+        if hasattr(self, 'vad'):
+            self.vad.min_duration = min_dur
+        
     def set_tray(self, tray):
         self._tray = tray
         self._set_status("idle")
@@ -175,6 +180,7 @@ class AquaOverlay(QMainWindow):
         max_sec = config_manager.settings.get("audio", {}).get("max_record_seconds", 60)
         
         def on_auto_stop():
+            # Signal emitter from background thread
             self.stop_recording_signal.emit()
             
         try:
@@ -183,6 +189,8 @@ class AquaOverlay(QMainWindow):
             self._set_status("error")
             self.label.setText("❌")
             print(f"Rec Error: {e}")
+            if self._tray:
+                self._tray.showMessage(t("app_name"), f"Recording Failed: {e}", QSystemTrayIcon.MessageIcon.Critical, 2000)
             self.reset_ui_delayed()
 
     def stop_recording(self):
@@ -240,7 +248,7 @@ class AquaOverlay(QMainWindow):
 
     def do_paste(self):
         # Simplified paste logic
-        delay = config_manager.settings.get("audio", {}).get("paste_delay_ms", 60)
+        delay = config_manager.settings.get("audio", {}).get("paste_delay_ms", 200)
         def _job():
             try:
                 # Release modifiers
@@ -248,10 +256,18 @@ class AquaOverlay(QMainWindow):
                     try: self.keyboard_controller.release(k)
                     except: pass
                 
+                print(f"DEBUG: do_paste - TargetWindow: {self._paste_target_window}, Xdotool: {shutil.which('xdotool')}")
+                cb_text = QApplication.clipboard().text()
+                print(f"DEBUG: Clipboard content before paste: '{cb_text}'")
+                
                 if shutil.which("xdotool") and self._paste_target_window:
-                     subprocess.run(["xdotool", "windowactivate", "--sync", self._paste_target_window], capture_output=True)
-                     subprocess.run(["xdotool", "key", "--clearmodifiers", "ctrl+v"], capture_output=True)
+                     print("DEBUG: Executing xdotool paste")
+                     r1 = subprocess.run(["xdotool", "windowactivate", "--sync", self._paste_target_window], capture_output=True, text=True)
+                     print(f"DEBUG: activate ret={r1.returncode}, err={r1.stderr}")
+                     r2 = subprocess.run(["xdotool", "key", "--clearmodifiers", "ctrl+v"], capture_output=True, text=True)
+                     print(f"DEBUG: key ret={r2.returncode}, err={r2.stderr}")
                 else:
+                     print("DEBUG: Fallback to pynput paste")
                      with self.keyboard_controller.pressed(keyboard.Key.ctrl):
                          self.keyboard_controller.press('v')
                          self.keyboard_controller.release('v')

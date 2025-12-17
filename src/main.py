@@ -17,6 +17,7 @@ def setup_logging():
     log_dir = get_state_dir()
     os.makedirs(log_dir, exist_ok=True)
     log_file = os.path.join(log_dir, "app.log")
+    print(f"DEBUG: Log file path: {log_file}")
     
     logging.basicConfig(
         level=logging.INFO,
@@ -54,6 +55,8 @@ def main():
     # System Tray
     tray = QSystemTrayIcon(app)
     tray.setIcon(make_tray_icon_for_state("idle"))
+    tray.setToolTip("Voice In")
+    tray.show()
     
     menu = QMenu()
     
