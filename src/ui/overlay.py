@@ -30,7 +30,7 @@ class AquaOverlay(QMainWindow):
     def __init__(self):
         super().__init__()
         self.recorder = AudioRecorder()
-        self.vad = SimpleVAD()
+        # self.vad = SimpleVAD() # Deprecated, using Rust VAD in recorder
         
         self._tray = None
         self._last_text = ""
@@ -197,8 +197,8 @@ class AquaOverlay(QMainWindow):
         if not self.recorder.is_recording: return
         wav_path = self.recorder.stop()
         
-        stats = self.recorder.get_stats()
-        if self.vad.is_silence(stats):
+        # Use Rust-based VAD check
+        if self.recorder.is_silence():
              try: os.remove(wav_path)
              except: pass
              self.reset_ui()

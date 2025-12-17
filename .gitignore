@@ -32,3 +32,6 @@ app.log
 .vscode/
 # backlog.md
 .venv
+
+# Rust
+rust_core/target/

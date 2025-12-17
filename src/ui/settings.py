@@ -298,12 +298,21 @@ class SettingsDialog(QDialog):
         self.cmb_input_device.clear()
         self.cmb_input_device.addItem("Default", None)
         try:
-            devices = sd.query_devices()
-            for idx, dev in enumerate(devices):
-                if int(dev.get("max_input_channels", 0)) > 0:
-                    self.cmb_input_device.addItem(f"{dev.get('name')} ({idx})", idx)
-        except Exception:
-            pass
+            import rust_core
+            devices = rust_core.get_input_devices()
+            # devices is list of (name, index)
+            for name, idx in devices:
+                self.cmb_input_device.addItem(f"{name} ({idx})", idx)
+        except Exception as e:
+            # Fallback to sounddevice if rust fails or logic differs
+            try:
+                import sounddevice as sd
+                devices = sd.query_devices()
+                for idx, dev in enumerate(devices):
+                    if int(dev.get("max_input_channels", 0)) > 0:
+                        self.cmb_input_device.addItem(f"{dev.get('name')} (sd:{idx})", idx)
+            except:
+                pass
 
     def on_dict_add(self):
         row = self.tbl_dict.rowCount()
