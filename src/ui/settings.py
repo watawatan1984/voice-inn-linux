@@ -14,7 +14,8 @@ from src.core.i18n import t
 from src.ai.worker import AIWorker
 
 # Reuse audio logic for tests if possible or keep simple inside dialog
-from src.audio.recorder import open_input_stream_with_fallback, SAMPLE_RATE
+# from src.audio.recorder import open_input_stream_with_fallback, SAMPLE_RATE
+SAMPLE_RATE = 44100
 
 class SettingsDialog(QDialog):
     # settings_applied signal? 
@@ -388,11 +389,22 @@ class SettingsDialog(QDialog):
                  self._mic_level = level
         try:
             device = self.cmb_input_device.currentData()
-            self._mic_stream, _ = open_input_stream_with_fallback(device=device, channels=1, callback=callback, preferred_sr=SAMPLE_RATE)
+            # Use sounddevice directly for testing since Rust recorder doesn't support callback streaming to Python yet
+            if device is not None and not isinstance(device, int):
+                # Fallback if device is not int (Rust path uses int, SD uses int or str but Config stores int mostly now)
+                pass 
+                
+            self._mic_stream = sd.InputStream(
+                device=device,
+                channels=1,
+                samplerate=SAMPLE_RATE,
+                callback=callback
+            )
             self._mic_stream.start()
             self.btn_mic_test.setText(t("tests_mic_stop"))
             self._mic_timer.start()
-        except Exception:
+        except Exception as e:
+            print(f"Mic Test Error: {e}")
             self._mic_stream = None
 
     def _stop_mic_test(self):
@@ -419,12 +431,18 @@ class SettingsDialog(QDialog):
         
         try:
             device = self.cmb_input_device.currentData()
-            self._test_rec_stream, sr = open_input_stream_with_fallback(device=device, channels=1, callback=callback, preferred_sr=SAMPLE_RATE)
-            self._test_recording_fs = int(sr)
+            self._test_rec_stream = sd.InputStream(
+                device=device,
+                channels=1,
+                samplerate=SAMPLE_RATE,
+                callback=callback
+            )
+            self._test_recording_fs = int(self._test_rec_stream.samplerate)
             self._test_rec_stream.start()
             self.btn_test_record.setEnabled(False)
             self.btn_test_stop.setEnabled(True)
-        except Exception:
+        except Exception as e:
+            print(f"Test Record Error: {e}")
             pass
 
     def on_test_stop_recording(self):

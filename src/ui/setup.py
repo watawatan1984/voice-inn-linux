@@ -9,7 +9,8 @@ import numpy as np
 import threading
 
 from src.core.config import config_manager
-from src.audio.recorder import open_input_stream_with_fallback, SAMPLE_RATE
+# from src.audio.recorder import open_input_stream_with_fallback, SAMPLE_RATE
+SAMPLE_RATE = 44100
 
 class SetupWizardDialog(QDialog):
     from PyQt6.QtCore import pyqtSignal
@@ -190,12 +191,20 @@ class SetupWizardDialog(QDialog):
         self.wiz_input_device.clear()
         self.wiz_input_device.addItem("Default", None)
         try:
-            devices = sd.query_devices()
-            for idx, dev in enumerate(devices):
-                 if int(dev.get("max_input_channels", 0)) > 0:
-                     self.wiz_input_device.addItem(f"{dev.get('name')} ({idx})", idx)
-        except Exception:
-            pass
+            import rust_core
+            devices = rust_core.get_input_devices()
+            for name, idx in devices:
+                self.wiz_input_device.addItem(f"{name} ({idx})", idx)
+        except Exception as e:
+             # Fallback
+            try:
+                import sounddevice as sd
+                devices = sd.query_devices()
+                for idx, dev in enumerate(devices):
+                     if int(dev.get("max_input_channels", 0)) > 0:
+                         self.wiz_input_device.addItem(f"{dev.get('name')} (sd:{idx})", idx)
+            except:
+                pass
 
     def _toggle_mic_test(self):
         if self._mic_stream:
@@ -210,11 +219,17 @@ class SetupWizardDialog(QDialog):
                  self._mic_level = level
         try:
             device = self.wiz_input_device.currentData()
-            self._mic_stream, _ = open_input_stream_with_fallback(device=device, channels=1, callback=callback, preferred_sr=SAMPLE_RATE)
+            self._mic_stream = sd.InputStream(
+                device=device,
+                channels=1,
+                samplerate=SAMPLE_RATE,
+                callback=callback
+            )
             self._mic_stream.start()
             self.btn_mic_test.setText("Stop Mic Test")
             self._mic_timer.start()
-        except Exception:
+        except Exception as e:
+            print(f"Mic Test Error: {e}")
             self._mic_stream = None
 
     def _stop_mic_test(self):
