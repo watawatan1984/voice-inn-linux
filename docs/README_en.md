@@ -48,9 +48,46 @@ It's extremely simple.
 
 Right-click the tray icon and select `Settings` for more options:
 
-- **VAD Settings**: Adjust sensitivity for detecting speech.
-- **Prompt Engineering**: Instruct the AI to "translate to Spanish" or "summarize as bullet points".
-- **Dictionary**: Add custom words or technical terms for better recognition.
+### 1. General
+
+Basic configuration for the application environment.
+
+- **AI Provider**:
+  - `Groq`: Ultra-fast. Requires internet connection.
+  - `Gemini`: High accuracy, better for long context. Requires internet.
+  - `Local`: Process entirely on your PC. Privacy-focused & offline capable. (Downloads model on first use)
+- **Gemini Model / Groq API Key**: Enter the key/model for your selected provider.
+- **Input Device**: Select the microphone to use.
+- **Input Gain**: Boost microphone volume (dB). Increase if your voice is too quiet.
+- **Hold Key**: Change the key used for recording (Default: `Left Alt`).
+- **Max Recording**: Maximum duration (seconds) per input. Automatically transcribes if exceeded.
+- **Min Valid Duration**: Shorter sounds will be ignored to prevent accidental triggers.
+- **Auto Paste**: If ON, automatically types the result. If OFF, only copies to clipboard.
+- **Paste Delay**: Wait time (ms) before typing. Increase if the app types before focus is switched.
+- **Language**: Switch the application language.
+
+### 2. Prompts
+
+Customize AI instructions to change transcription style.
+
+- **Groq Whisper Prompt**: Provide context hints for valid speech recognition (e.g., "Medical transcription").
+- **Refine System Prompt**: Rules for post-processing text. Instructions like "Translate to English" or "Summarize" go here.
+
+### 3. Dictionary
+
+Register frequently used words or fix common AI misinterpretations.
+
+- **From**: The wrong word AI produces (e.g., "VoiceInn").
+- **To**: The correct word (e.g., "Voice In").
+- The app will strictly replace text based on these rules.
+
+### 4. Local Whisper
+
+Advanced settings when `Local` provider is selected.
+
+- **Model Size**: Larger models (`large-v3`) are more accurate but slower and use more memory. `base` or `small` are faster.
+- **Device**: Select `cuda` (NVIDIA GPU) or `cpu`.
+- **Compute Type**: Precision level. `float16` is standard; try `int8` if you have limited memory.
 
 ---
 
