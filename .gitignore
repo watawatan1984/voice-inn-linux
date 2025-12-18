@@ -35,3 +35,5 @@ app.log
 
 # Rust
 rust_core/target/
+assistant_dev/
+/rust-migration

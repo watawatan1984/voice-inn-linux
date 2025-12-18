@@ -95,6 +95,8 @@ AIへの指示をカスタマイズして、文字起こしのスタイルを変
 
 技術的な詳細や、ソースコードからのビルド方法は [DEVELOPMENT.md](docs/DEVELOPMENT.md) をご覧ください。
 
+開発環境のセットアップは [SETUP_UV.md](SETUP_UV.md) を参照してください。
+
 Voice In は Rust (音声処理コア) と Python (UI/AI統合) で構築されており、オープンソースとして開発されています。
 
 ---
