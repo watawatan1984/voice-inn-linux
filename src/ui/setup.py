@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
     QLabel, QPushButton, QComboBox, QLineEdit, QSpinBox, 
     QCheckBox, QMessageBox, QFormLayout, QProgressBar
 )
-from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtCore import QTimer, Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon
 import sounddevice as sd
 import numpy as np
@@ -223,12 +223,46 @@ class SetupWizardDialog(QDialog):
         self.lbl_local_note = QLabel("ℹ️ Local Whisper requires 'faster-whisper' installed. Model default: large-v3.")
         self.lbl_local_note.setWordWrap(True)
         self.lbl_local_note.setStyleSheet("padding: 12px; background-color: #e3f2fd; border-radius: 4px; color: #1976d2;")
+        
+        # Model download button for local provider
+        self.btn_download_model = QPushButton("⬇️ Download Model")
+        self.btn_download_model.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+            }
+        """)
+        self.btn_download_model.clicked.connect(self._download_local_model)
+        
+        self.lbl_download_status = QLabel("")
+        self.lbl_download_status.setWordWrap(True)
+        self.lbl_download_status.setStyleSheet("padding: 8px; color: #666;")
+        
+        self.progress_download = QProgressBar()
+        self.progress_download.setRange(0, 0)  # Indeterminate progress
+        self.progress_download.setVisible(False)
 
         form.addRow("AI Provider:", self.wiz_provider)
         form.addRow("Gemini Model:", self.wiz_gemini_model)
         form.addRow("Groq API Key:", groq_widget)
         form.addRow("Gemini API Key:", gemini_widget)
         form.addRow("", self.lbl_local_note)
+        
+        # Local model download section
+        local_download_layout = QVBoxLayout()
+        local_download_layout.addWidget(self.btn_download_model)
+        local_download_layout.addWidget(self.progress_download)
+        local_download_layout.addWidget(self.lbl_download_status)
+        local_download_widget = QWidget()
+        local_download_widget.setLayout(local_download_layout)
+        form.addRow("", local_download_widget)
 
         layout.addLayout(form)
         layout.addStretch(1)
@@ -382,6 +416,7 @@ class SetupWizardDialog(QDialog):
         prov = self.wiz_provider.currentText()
         is_gemini = (prov == "gemini")
         is_groq = (prov == "groq")
+        is_local = (prov == "local")
         
         # Enable/disable fields based on provider
         self.wiz_gemini_model.setEnabled(is_gemini)
@@ -391,7 +426,9 @@ class SetupWizardDialog(QDialog):
         self.wiz_groq_key.setEnabled(is_groq)
         self.wiz_groq_key.setReadOnly(not is_groq)
         
-        self.lbl_local_note.setVisible(prov == "local")
+        self.lbl_local_note.setVisible(is_local)
+        self.btn_download_model.setVisible(is_local)
+        self.lbl_download_status.setVisible(is_local)
         
         # Ensure enabled fields can receive focus
         if is_gemini:
@@ -502,6 +539,84 @@ class SetupWizardDialog(QDialog):
         config_manager.update_settings({"audio": new_audio})
         self.settings_applied.emit(config_manager.settings)
 
+    def _download_local_model(self):
+        """Download Whisper model for local provider"""
+        try:
+            from faster_whisper import WhisperModel
+        except ImportError:
+            QMessageBox.warning(
+                self,
+                "Missing Dependency",
+                "faster-whisper is not installed.\n\n"
+                "Please install it with:\n"
+                "pip install faster-whisper"
+            )
+            return
+        
+        self.btn_download_model.setEnabled(False)
+        self.progress_download.setVisible(True)
+        self.lbl_download_status.setText("Downloading model... This may take several minutes.")
+        
+        # Get model settings
+        local_settings = config_manager.settings.get("local", {})
+        model_size = local_settings.get("model_size", "large-v3")
+        device = local_settings.get("device", "cuda")
+        compute_type = local_settings.get("compute_type", "float16")
+        
+        # Download in background thread
+        self._download_thread = ModelDownloadThread(model_size, device, compute_type)
+        self._download_thread.finished.connect(self._on_model_download_finished)
+        self._download_thread.error.connect(self._on_model_download_error)
+        self._download_thread.start()
+    
+    def _on_model_download_finished(self, success):
+        self.progress_download.setVisible(False)
+        self.btn_download_model.setEnabled(True)
+        if success:
+            self.lbl_download_status.setText("✅ Model downloaded successfully!")
+            self.lbl_download_status.setStyleSheet("padding: 8px; color: #4CAF50; font-weight: bold;")
+        else:
+            self.lbl_download_status.setText("❌ Model download failed. Please check the logs.")
+            self.lbl_download_status.setStyleSheet("padding: 8px; color: #f44336;")
+    
+    def _on_model_download_error(self, error_msg):
+        self.progress_download.setVisible(False)
+        self.btn_download_model.setEnabled(True)
+        self.lbl_download_status.setText(f"❌ Error: {error_msg}")
+        self.lbl_download_status.setStyleSheet("padding: 8px; color: #f44336;")
+        QMessageBox.critical(self, "Download Error", f"Failed to download model:\n{error_msg}")
+    
     def closeEvent(self, event):
         self._stop_mic_test()
+        if hasattr(self, '_download_thread') and self._download_thread.isRunning():
+            self._download_thread.terminate()
+            self._download_thread.wait()
         event.accept()
+
+
+class ModelDownloadThread(QThread):
+    """Background thread for downloading Whisper model"""
+    finished = pyqtSignal(bool)
+    error = pyqtSignal(str)
+    
+    def __init__(self, model_size, device, compute_type):
+        super().__init__()
+        self.model_size = model_size
+        self.device = device
+        self.compute_type = compute_type
+    
+    def run(self):
+        try:
+            from faster_whisper import WhisperModel
+            import logging
+            
+            logging.info(f"Downloading Whisper model: {self.model_size} on {self.device} ({self.compute_type})")
+            # This will automatically download the model if not present
+            model = WhisperModel(self.model_size, device=self.device, compute_type=self.compute_type)
+            logging.info("Model downloaded successfully")
+            self.finished.emit(True)
+        except Exception as e:
+            import traceback
+            error_msg = str(e)
+            logging.error(f"Model download error: {traceback.format_exc()}")
+            self.error.emit(error_msg)
