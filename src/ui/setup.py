@@ -3,7 +3,8 @@ from PyQt6.QtWidgets import (
     QLabel, QPushButton, QComboBox, QLineEdit, QSpinBox, 
     QCheckBox, QMessageBox, QFormLayout, QProgressBar
 )
-from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtCore import QTimer, Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QIcon
 import sounddevice as sd
 import numpy as np
 import threading
@@ -18,8 +19,66 @@ class SetupWizardDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Setup Wizard")
-        self.setMinimumSize(820, 560)
+        self.setWindowTitle("Voice In - Setup Wizard")
+        self.setMinimumSize(900, 600)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #f5f5f5;
+            }
+            QLabel {
+                color: #333;
+            }
+            QPushButton {
+                background-color: #4285F4;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #357ae8;
+            }
+            QPushButton:pressed {
+                background-color: #2d6fc7;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+                color: #666666;
+            }
+            QLineEdit, QComboBox, QSpinBox {
+                padding: 6px;
+                border: 2px solid #ddd;
+                border-radius: 4px;
+                background-color: white;
+                font-size: 13px;
+            }
+            QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
+                border: 2px solid #4285F4;
+            }
+            QLineEdit:disabled {
+                background-color: #f5f5f5;
+                color: #999;
+            }
+            QLineEdit[readOnly="true"] {
+                background-color: #f5f5f5;
+                color: #999;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QProgressBar {
+                border: 2px solid #ddd;
+                border-radius: 4px;
+                text-align: center;
+                background-color: #f0f0f0;
+            }
+            QProgressBar::chunk {
+                background-color: #4285F4;
+                border-radius: 2px;
+            }
+        """)
 
         self._audio_lock = threading.Lock()
         self._mic_level = 0.0
@@ -32,9 +91,17 @@ class SetupWizardDialog(QDialog):
         self._build_page_controls()
         self._build_page_finish()
 
-        self.btn_back = QPushButton("Back")
-        self.btn_next = QPushButton("Next")
+        self.btn_back = QPushButton("← Back")
+        self.btn_next = QPushButton("Next →")
         self.btn_cancel = QPushButton("Cancel")
+        self.btn_cancel.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+            }
+            QPushButton:hover {
+                background-color: #d32f2f;
+            }
+        """)
         self.btn_back.clicked.connect(self._back)
         self.btn_next.clicked.connect(self._next)
         self.btn_cancel.clicked.connect(self.close)
@@ -61,16 +128,26 @@ class SetupWizardDialog(QDialog):
     def _build_page_welcome(self):
         w = QWidget()
         layout = QVBoxLayout()
-        title = QLabel("Welcome")
-        title.setStyleSheet("font-size: 18px; font-weight: bold;")
+        layout.setSpacing(20)
+        layout.setContentsMargins(40, 40, 40, 40)
+        
+        title = QLabel("🎤 Welcome to Voice In")
+        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #4285F4; margin-bottom: 10px;")
+        
+        subtitle = QLabel("AI-powered Voice Dictation Tool")
+        subtitle.setStyleSheet("font-size: 14px; color: #666; margin-bottom: 30px;")
+        
         body = QLabel(
-            "This wizard helps you complete initial setup.\n\n"
-            "1) Configure AI provider and API key\n"
-            "2) Select microphone\n"
-            "3) Configure hotkey and paste options"
+            "This wizard will guide you through the initial setup:\n\n"
+            "✨ Configure AI provider and API key\n"
+            "🎙️ Select your microphone\n"
+            "⌨️ Configure hotkey and paste options"
         )
         body.setWordWrap(True)
+        body.setStyleSheet("font-size: 14px; color: #333; line-height: 1.6; padding: 20px; background-color: white; border-radius: 8px;")
+        
         layout.addWidget(title)
+        layout.addWidget(subtitle)
         layout.addWidget(body)
         layout.addStretch(1)
         w.setLayout(layout)
@@ -78,58 +155,199 @@ class SetupWizardDialog(QDialog):
 
     def _build_page_provider(self):
         w = QWidget()
+        layout = QVBoxLayout()
+        layout.setSpacing(20)
+        layout.setContentsMargins(40, 40, 40, 40)
+        
+        title = QLabel("🤖 AI Provider Configuration")
+        title.setStyleSheet("font-size: 20px; font-weight: bold; color: #4285F4; margin-bottom: 20px;")
+        layout.addWidget(title)
+        
         form = QFormLayout()
+        form.setSpacing(15)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
         self.wiz_provider = QComboBox()
         self.wiz_provider.addItems(["gemini", "groq", "local"])
         self.wiz_provider.currentTextChanged.connect(self._update_provider_ui)
+        self.wiz_provider.setStyleSheet("min-width: 200px;")
         
         self.wiz_gemini_model = QLineEdit()
+        self.wiz_gemini_model.setPlaceholderText("e.g., gemini-2.5-flash")
+        
+        # API Key fields with show/hide toggle
+        # Start with normal mode to ensure input works, then switch to password mode
         self.wiz_groq_key = QLineEdit()
-        self.wiz_groq_key.setEchoMode(QLineEdit.EchoMode.Password)
+        self.wiz_groq_key.setPlaceholderText("Enter your Groq API key")
+        self.wiz_groq_key.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.wiz_groq_key.setReadOnly(False)
+        self.wiz_groq_key.setEnabled(True)
+        # Set password mode after widget is fully initialized
+        QTimer.singleShot(0, lambda: self.wiz_groq_key.setEchoMode(QLineEdit.EchoMode.Password))
+        
+        self.btn_show_groq = QPushButton("👁️")
+        self.btn_show_groq.setCheckable(True)
+        self.btn_show_groq.setMaximumWidth(40)
+        self.btn_show_groq.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # Don't steal focus
+        self.btn_show_groq.clicked.connect(lambda: self._toggle_password_visibility(self.wiz_groq_key, self.btn_show_groq))
+        
+        groq_row = QHBoxLayout()
+        groq_row.setSpacing(5)
+        groq_row.addWidget(self.wiz_groq_key)
+        groq_row.addWidget(self.btn_show_groq)
+        groq_widget = QWidget()
+        groq_widget.setLayout(groq_row)
+        
         self.wiz_gemini_key = QLineEdit()
-        self.wiz_gemini_key.setEchoMode(QLineEdit.EchoMode.Password)
+        self.wiz_gemini_key.setPlaceholderText("Enter your Gemini API key")
+        self.wiz_gemini_key.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.wiz_gemini_key.setReadOnly(False)
+        self.wiz_gemini_key.setEnabled(True)
+        # Set password mode after widget is fully initialized
+        QTimer.singleShot(0, lambda: self.wiz_gemini_key.setEchoMode(QLineEdit.EchoMode.Password))
+        
+        self.btn_show_gemini = QPushButton("👁️")
+        self.btn_show_gemini.setCheckable(True)
+        self.btn_show_gemini.setMaximumWidth(40)
+        self.btn_show_gemini.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # Don't steal focus
+        self.btn_show_gemini.clicked.connect(lambda: self._toggle_password_visibility(self.wiz_gemini_key, self.btn_show_gemini))
+        
+        gemini_row = QHBoxLayout()
+        gemini_row.setSpacing(5)
+        gemini_row.addWidget(self.wiz_gemini_key)
+        gemini_row.addWidget(self.btn_show_gemini)
+        gemini_widget = QWidget()
+        gemini_widget.setLayout(gemini_row)
         
         # Local settings for setup wizard needed? Maybe basic ones.
-        self.lbl_local_note = QLabel("Local Whisper requires 'faster-whisper' installed. Model default: large-v3.")
+        self.lbl_local_note = QLabel("ℹ️ Local Whisper requires 'faster-whisper' installed. Model default: large-v3.")
         self.lbl_local_note.setWordWrap(True)
+        self.lbl_local_note.setStyleSheet("padding: 12px; background-color: #e3f2fd; border-radius: 4px; color: #1976d2;")
+        
+        # Model download button for local provider
+        self.btn_download_model = QPushButton("⬇️ Download Model")
+        self.btn_download_model.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+            }
+        """)
+        self.btn_download_model.clicked.connect(self._download_local_model)
+        
+        self.lbl_download_status = QLabel("")
+        self.lbl_download_status.setWordWrap(True)
+        self.lbl_download_status.setStyleSheet("padding: 8px; color: #666;")
+        
+        self.progress_download = QProgressBar()
+        self.progress_download.setRange(0, 0)  # Indeterminate progress
+        self.progress_download.setVisible(False)
 
-        form.addRow("AI Provider", self.wiz_provider)
-        form.addRow("Gemini Model", self.wiz_gemini_model)
-        form.addRow("Groq API Key", self.wiz_groq_key)
-        form.addRow("Gemini API Key", self.wiz_gemini_key)
-        form.addRow(self.lbl_local_note)
+        form.addRow("AI Provider:", self.wiz_provider)
+        form.addRow("Gemini Model:", self.wiz_gemini_model)
+        form.addRow("Groq API Key:", groq_widget)
+        form.addRow("Gemini API Key:", gemini_widget)
+        form.addRow("", self.lbl_local_note)
+        
+        # Local model download section
+        local_download_layout = QVBoxLayout()
+        local_download_layout.addWidget(self.btn_download_model)
+        local_download_layout.addWidget(self.progress_download)
+        local_download_layout.addWidget(self.lbl_download_status)
+        local_download_widget = QWidget()
+        local_download_widget.setLayout(local_download_layout)
+        form.addRow("", local_download_widget)
 
-        w.setLayout(form)
+        layout.addLayout(form)
+        layout.addStretch(1)
+        w.setLayout(layout)
         self.pages.addWidget(w)
+    
+    def _toggle_password_visibility(self, line_edit, button):
+        """Toggle password visibility for API key fields"""
+        if button.isChecked():
+            line_edit.setEchoMode(QLineEdit.EchoMode.Normal)
+            button.setText("🙈")
+        else:
+            line_edit.setEchoMode(QLineEdit.EchoMode.Password)
+            button.setText("👁️")
 
     def _build_page_device(self):
         w = QWidget()
         layout = QVBoxLayout()
+        layout.setSpacing(20)
+        layout.setContentsMargins(40, 40, 40, 40)
+        
+        title = QLabel("🎙️ Microphone Configuration")
+        title.setStyleSheet("font-size: 20px; font-weight: bold; color: #4285F4; margin-bottom: 20px;")
+        layout.addWidget(title)
+        
+        device_label = QLabel("Input Device:")
+        device_label.setStyleSheet("font-weight: bold; font-size: 13px;")
+        layout.addWidget(device_label)
+        
         top = QHBoxLayout()
+        top.setSpacing(10)
         self.wiz_input_device = QComboBox()
-        self.btn_refresh_devices = QPushButton("Refresh")
+        self.btn_refresh_devices = QPushButton("🔄 Refresh")
         self.btn_refresh_devices.clicked.connect(self._refresh_devices)
-        top.addWidget(QLabel("Input Device"))
         top.addWidget(self.wiz_input_device, 1)
         top.addWidget(self.btn_refresh_devices)
         layout.addLayout(top)
         
+        layout.addSpacing(30)
+        
+        test_label = QLabel("Microphone Test:")
+        test_label.setStyleSheet("font-weight: bold; font-size: 13px; margin-top: 10px;")
+        layout.addWidget(test_label)
+        
         mic_row = QHBoxLayout()
-        self.btn_mic_test = QPushButton("Start Mic Test")
+        mic_row.setSpacing(10)
+        self.btn_mic_test = QPushButton("▶️ Start Mic Test")
         self.mic_bar = QProgressBar()
         self.mic_bar.setRange(0, 100)
+        self.mic_bar.setStyleSheet("""
+            QProgressBar {
+                height: 25px;
+                border: 2px solid #ddd;
+                border-radius: 4px;
+                text-align: center;
+                background-color: #f0f0f0;
+            }
+            QProgressBar::chunk {
+                background-color: #4285F4;
+                border-radius: 2px;
+            }
+        """)
         self.btn_mic_test.clicked.connect(self._toggle_mic_test)
         mic_row.addWidget(self.btn_mic_test)
-        mic_row.addWidget(self.mic_bar)
+        mic_row.addWidget(self.mic_bar, 1)
         layout.addLayout(mic_row)
+        
         layout.addStretch(1)
         w.setLayout(layout)
         self.pages.addWidget(w)
 
     def _build_page_controls(self):
         w = QWidget()
+        layout = QVBoxLayout()
+        layout.setSpacing(20)
+        layout.setContentsMargins(40, 40, 40, 40)
+        
+        title = QLabel("⌨️ Control Settings")
+        title.setStyleSheet("font-size: 20px; font-weight: bold; color: #4285F4; margin-bottom: 20px;")
+        layout.addWidget(title)
+        
         form = QFormLayout()
+        form.setSpacing(15)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        
         self.wiz_hold_key = QComboBox()
         for k, v in [("Left Alt", "alt_l"), ("Right Alt", "alt_r"), ("Left Ctrl", "ctrl_l"), ("Right Ctrl", "ctrl_r")]:
              self.wiz_hold_key.addItem(k, v)
@@ -138,20 +356,35 @@ class SetupWizardDialog(QDialog):
         self.wiz_max_record_seconds.setRange(5, 600)
         self.wiz_max_record_seconds.setSuffix(" s")
         
-        self.wiz_auto_paste = QCheckBox("Paste automatically")
+        self.wiz_auto_paste = QCheckBox("Automatically paste transcribed text")
+        self.wiz_auto_paste.setStyleSheet("padding: 5px;")
         
-        form.addRow("Hold Key", self.wiz_hold_key)
-        form.addRow("Max Recording", self.wiz_max_record_seconds)
-        form.addRow("Auto Paste", self.wiz_auto_paste)
-        w.setLayout(form)
+        form.addRow("Hold Key:", self.wiz_hold_key)
+        form.addRow("Max Recording Time:", self.wiz_max_record_seconds)
+        form.addRow("", self.wiz_auto_paste)
+        
+        layout.addLayout(form)
+        layout.addStretch(1)
+        w.setLayout(layout)
         self.pages.addWidget(w)
 
     def _build_page_finish(self):
         w = QWidget()
         layout = QVBoxLayout()
-        title = QLabel("Finish")
-        title.setStyleSheet("font-size: 18px; font-weight: bold;")
-        self.lbl_finish = QLabel("Click Finish to save settings and start using Voice In.")
+        layout.setSpacing(20)
+        layout.setContentsMargins(40, 40, 40, 40)
+        
+        title = QLabel("✅ Setup Complete!")
+        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #4285F4; margin-bottom: 20px;")
+        
+        self.lbl_finish = QLabel(
+            "All settings have been configured.\n\n"
+            "Click 'Finish' to save your settings and start using Voice In.\n\n"
+            "You can change these settings anytime from the system tray menu."
+        )
+        self.lbl_finish.setWordWrap(True)
+        self.lbl_finish.setStyleSheet("font-size: 14px; color: #333; line-height: 1.6; padding: 20px; background-color: white; border-radius: 8px;")
+        
         layout.addWidget(title)
         layout.addWidget(self.lbl_finish)
         layout.addStretch(1)
@@ -182,10 +415,26 @@ class SetupWizardDialog(QDialog):
     def _update_provider_ui(self):
         prov = self.wiz_provider.currentText()
         is_gemini = (prov == "gemini")
+        is_groq = (prov == "groq")
+        is_local = (prov == "local")
+        
+        # Enable/disable fields based on provider
         self.wiz_gemini_model.setEnabled(is_gemini)
         self.wiz_gemini_key.setEnabled(is_gemini)
-        self.wiz_groq_key.setEnabled(prov == "groq")
-        self.lbl_local_note.setVisible(prov == "local")
+        self.wiz_gemini_key.setReadOnly(not is_gemini)
+        
+        self.wiz_groq_key.setEnabled(is_groq)
+        self.wiz_groq_key.setReadOnly(not is_groq)
+        
+        self.lbl_local_note.setVisible(is_local)
+        self.btn_download_model.setVisible(is_local)
+        self.lbl_download_status.setVisible(is_local)
+        
+        # Ensure enabled fields can receive focus
+        if is_gemini:
+            self.wiz_gemini_key.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        if is_groq:
+            self.wiz_groq_key.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
     def _refresh_devices(self):
         self.wiz_input_device.clear()
@@ -290,6 +539,84 @@ class SetupWizardDialog(QDialog):
         config_manager.update_settings({"audio": new_audio})
         self.settings_applied.emit(config_manager.settings)
 
+    def _download_local_model(self):
+        """Download Whisper model for local provider"""
+        try:
+            from faster_whisper import WhisperModel
+        except ImportError:
+            QMessageBox.warning(
+                self,
+                "Missing Dependency",
+                "faster-whisper is not installed.\n\n"
+                "Please install it with:\n"
+                "pip install faster-whisper"
+            )
+            return
+        
+        self.btn_download_model.setEnabled(False)
+        self.progress_download.setVisible(True)
+        self.lbl_download_status.setText("Downloading model... This may take several minutes.")
+        
+        # Get model settings
+        local_settings = config_manager.settings.get("local", {})
+        model_size = local_settings.get("model_size", "large-v3")
+        device = local_settings.get("device", "cuda")
+        compute_type = local_settings.get("compute_type", "float16")
+        
+        # Download in background thread
+        self._download_thread = ModelDownloadThread(model_size, device, compute_type)
+        self._download_thread.finished.connect(self._on_model_download_finished)
+        self._download_thread.error.connect(self._on_model_download_error)
+        self._download_thread.start()
+    
+    def _on_model_download_finished(self, success):
+        self.progress_download.setVisible(False)
+        self.btn_download_model.setEnabled(True)
+        if success:
+            self.lbl_download_status.setText("✅ Model downloaded successfully!")
+            self.lbl_download_status.setStyleSheet("padding: 8px; color: #4CAF50; font-weight: bold;")
+        else:
+            self.lbl_download_status.setText("❌ Model download failed. Please check the logs.")
+            self.lbl_download_status.setStyleSheet("padding: 8px; color: #f44336;")
+    
+    def _on_model_download_error(self, error_msg):
+        self.progress_download.setVisible(False)
+        self.btn_download_model.setEnabled(True)
+        self.lbl_download_status.setText(f"❌ Error: {error_msg}")
+        self.lbl_download_status.setStyleSheet("padding: 8px; color: #f44336;")
+        QMessageBox.critical(self, "Download Error", f"Failed to download model:\n{error_msg}")
+    
     def closeEvent(self, event):
         self._stop_mic_test()
+        if hasattr(self, '_download_thread') and self._download_thread.isRunning():
+            self._download_thread.terminate()
+            self._download_thread.wait()
         event.accept()
+
+
+class ModelDownloadThread(QThread):
+    """Background thread for downloading Whisper model"""
+    finished = pyqtSignal(bool)
+    error = pyqtSignal(str)
+    
+    def __init__(self, model_size, device, compute_type):
+        super().__init__()
+        self.model_size = model_size
+        self.device = device
+        self.compute_type = compute_type
+    
+    def run(self):
+        try:
+            from faster_whisper import WhisperModel
+            import logging
+            
+            logging.info(f"Downloading Whisper model: {self.model_size} on {self.device} ({self.compute_type})")
+            # This will automatically download the model if not present
+            model = WhisperModel(self.model_size, device=self.device, compute_type=self.compute_type)
+            logging.info("Model downloaded successfully")
+            self.finished.emit(True)
+        except Exception as e:
+            import traceback
+            error_msg = str(e)
+            logging.error(f"Model download error: {traceback.format_exc()}")
+            self.error.emit(error_msg)
