@@ -57,6 +57,14 @@ class SetupWizardDialog(QDialog):
             QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
                 border: 2px solid #4285F4;
             }
+            QLineEdit:disabled {
+                background-color: #f5f5f5;
+                color: #999;
+            }
+            QLineEdit[readOnly="true"] {
+                background-color: #f5f5f5;
+                color: #999;
+            }
             QComboBox::drop-down {
                 border: none;
             }
@@ -168,33 +176,44 @@ class SetupWizardDialog(QDialog):
         self.wiz_gemini_model.setPlaceholderText("e.g., gemini-2.5-flash")
         
         # API Key fields with show/hide toggle
+        # Start with normal mode to ensure input works, then switch to password mode
         self.wiz_groq_key = QLineEdit()
-        self.wiz_groq_key.setEchoMode(QLineEdit.EchoMode.Password)
         self.wiz_groq_key.setPlaceholderText("Enter your Groq API key")
         self.wiz_groq_key.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.wiz_groq_key.setReadOnly(False)
+        self.wiz_groq_key.setEnabled(True)
+        # Set password mode after widget is fully initialized
+        QTimer.singleShot(0, lambda: self.wiz_groq_key.setEchoMode(QLineEdit.EchoMode.Password))
         
         self.btn_show_groq = QPushButton("👁️")
         self.btn_show_groq.setCheckable(True)
         self.btn_show_groq.setMaximumWidth(40)
+        self.btn_show_groq.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # Don't steal focus
         self.btn_show_groq.clicked.connect(lambda: self._toggle_password_visibility(self.wiz_groq_key, self.btn_show_groq))
         
         groq_row = QHBoxLayout()
+        groq_row.setSpacing(5)
         groq_row.addWidget(self.wiz_groq_key)
         groq_row.addWidget(self.btn_show_groq)
         groq_widget = QWidget()
         groq_widget.setLayout(groq_row)
         
         self.wiz_gemini_key = QLineEdit()
-        self.wiz_gemini_key.setEchoMode(QLineEdit.EchoMode.Password)
         self.wiz_gemini_key.setPlaceholderText("Enter your Gemini API key")
         self.wiz_gemini_key.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.wiz_gemini_key.setReadOnly(False)
+        self.wiz_gemini_key.setEnabled(True)
+        # Set password mode after widget is fully initialized
+        QTimer.singleShot(0, lambda: self.wiz_gemini_key.setEchoMode(QLineEdit.EchoMode.Password))
         
         self.btn_show_gemini = QPushButton("👁️")
         self.btn_show_gemini.setCheckable(True)
         self.btn_show_gemini.setMaximumWidth(40)
+        self.btn_show_gemini.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # Don't steal focus
         self.btn_show_gemini.clicked.connect(lambda: self._toggle_password_visibility(self.wiz_gemini_key, self.btn_show_gemini))
         
         gemini_row = QHBoxLayout()
+        gemini_row.setSpacing(5)
         gemini_row.addWidget(self.wiz_gemini_key)
         gemini_row.addWidget(self.btn_show_gemini)
         gemini_widget = QWidget()
@@ -362,10 +381,23 @@ class SetupWizardDialog(QDialog):
     def _update_provider_ui(self):
         prov = self.wiz_provider.currentText()
         is_gemini = (prov == "gemini")
+        is_groq = (prov == "groq")
+        
+        # Enable/disable fields based on provider
         self.wiz_gemini_model.setEnabled(is_gemini)
         self.wiz_gemini_key.setEnabled(is_gemini)
-        self.wiz_groq_key.setEnabled(prov == "groq")
+        self.wiz_gemini_key.setReadOnly(not is_gemini)
+        
+        self.wiz_groq_key.setEnabled(is_groq)
+        self.wiz_groq_key.setReadOnly(not is_groq)
+        
         self.lbl_local_note.setVisible(prov == "local")
+        
+        # Ensure enabled fields can receive focus
+        if is_gemini:
+            self.wiz_gemini_key.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        if is_groq:
+            self.wiz_groq_key.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
     def _refresh_devices(self):
         self.wiz_input_device.clear()
