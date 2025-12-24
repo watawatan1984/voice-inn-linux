@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
     QCheckBox, QMessageBox, QFormLayout, QProgressBar
 )
 from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtGui import QIcon
 import sounddevice as sd
 import numpy as np
 import threading
@@ -18,8 +19,58 @@ class SetupWizardDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Setup Wizard")
-        self.setMinimumSize(820, 560)
+        self.setWindowTitle("Voice In - Setup Wizard")
+        self.setMinimumSize(900, 600)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #f5f5f5;
+            }
+            QLabel {
+                color: #333;
+            }
+            QPushButton {
+                background-color: #4285F4;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #357ae8;
+            }
+            QPushButton:pressed {
+                background-color: #2d6fc7;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+                color: #666666;
+            }
+            QLineEdit, QComboBox, QSpinBox {
+                padding: 6px;
+                border: 2px solid #ddd;
+                border-radius: 4px;
+                background-color: white;
+                font-size: 13px;
+            }
+            QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
+                border: 2px solid #4285F4;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QProgressBar {
+                border: 2px solid #ddd;
+                border-radius: 4px;
+                text-align: center;
+                background-color: #f0f0f0;
+            }
+            QProgressBar::chunk {
+                background-color: #4285F4;
+                border-radius: 2px;
+            }
+        """)
 
         self._audio_lock = threading.Lock()
         self._mic_level = 0.0
@@ -32,9 +83,17 @@ class SetupWizardDialog(QDialog):
         self._build_page_controls()
         self._build_page_finish()
 
-        self.btn_back = QPushButton("Back")
-        self.btn_next = QPushButton("Next")
+        self.btn_back = QPushButton("← Back")
+        self.btn_next = QPushButton("Next →")
         self.btn_cancel = QPushButton("Cancel")
+        self.btn_cancel.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+            }
+            QPushButton:hover {
+                background-color: #d32f2f;
+            }
+        """)
         self.btn_back.clicked.connect(self._back)
         self.btn_next.clicked.connect(self._next)
         self.btn_cancel.clicked.connect(self.close)
@@ -61,16 +120,26 @@ class SetupWizardDialog(QDialog):
     def _build_page_welcome(self):
         w = QWidget()
         layout = QVBoxLayout()
-        title = QLabel("Welcome")
-        title.setStyleSheet("font-size: 18px; font-weight: bold;")
+        layout.setSpacing(20)
+        layout.setContentsMargins(40, 40, 40, 40)
+        
+        title = QLabel("🎤 Welcome to Voice In")
+        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #4285F4; margin-bottom: 10px;")
+        
+        subtitle = QLabel("AI-powered Voice Dictation Tool")
+        subtitle.setStyleSheet("font-size: 14px; color: #666; margin-bottom: 30px;")
+        
         body = QLabel(
-            "This wizard helps you complete initial setup.\n\n"
-            "1) Configure AI provider and API key\n"
-            "2) Select microphone\n"
-            "3) Configure hotkey and paste options"
+            "This wizard will guide you through the initial setup:\n\n"
+            "✨ Configure AI provider and API key\n"
+            "🎙️ Select your microphone\n"
+            "⌨️ Configure hotkey and paste options"
         )
         body.setWordWrap(True)
+        body.setStyleSheet("font-size: 14px; color: #333; line-height: 1.6; padding: 20px; background-color: white; border-radius: 8px;")
+        
         layout.addWidget(title)
+        layout.addWidget(subtitle)
         layout.addWidget(body)
         layout.addStretch(1)
         w.setLayout(layout)
@@ -78,58 +147,154 @@ class SetupWizardDialog(QDialog):
 
     def _build_page_provider(self):
         w = QWidget()
+        layout = QVBoxLayout()
+        layout.setSpacing(20)
+        layout.setContentsMargins(40, 40, 40, 40)
+        
+        title = QLabel("🤖 AI Provider Configuration")
+        title.setStyleSheet("font-size: 20px; font-weight: bold; color: #4285F4; margin-bottom: 20px;")
+        layout.addWidget(title)
+        
         form = QFormLayout()
+        form.setSpacing(15)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
         self.wiz_provider = QComboBox()
         self.wiz_provider.addItems(["gemini", "groq", "local"])
         self.wiz_provider.currentTextChanged.connect(self._update_provider_ui)
+        self.wiz_provider.setStyleSheet("min-width: 200px;")
         
         self.wiz_gemini_model = QLineEdit()
+        self.wiz_gemini_model.setPlaceholderText("e.g., gemini-2.5-flash")
+        
+        # API Key fields with show/hide toggle
         self.wiz_groq_key = QLineEdit()
         self.wiz_groq_key.setEchoMode(QLineEdit.EchoMode.Password)
+        self.wiz_groq_key.setPlaceholderText("Enter your Groq API key")
+        self.wiz_groq_key.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        
+        self.btn_show_groq = QPushButton("👁️")
+        self.btn_show_groq.setCheckable(True)
+        self.btn_show_groq.setMaximumWidth(40)
+        self.btn_show_groq.clicked.connect(lambda: self._toggle_password_visibility(self.wiz_groq_key, self.btn_show_groq))
+        
+        groq_row = QHBoxLayout()
+        groq_row.addWidget(self.wiz_groq_key)
+        groq_row.addWidget(self.btn_show_groq)
+        groq_widget = QWidget()
+        groq_widget.setLayout(groq_row)
+        
         self.wiz_gemini_key = QLineEdit()
         self.wiz_gemini_key.setEchoMode(QLineEdit.EchoMode.Password)
+        self.wiz_gemini_key.setPlaceholderText("Enter your Gemini API key")
+        self.wiz_gemini_key.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        
+        self.btn_show_gemini = QPushButton("👁️")
+        self.btn_show_gemini.setCheckable(True)
+        self.btn_show_gemini.setMaximumWidth(40)
+        self.btn_show_gemini.clicked.connect(lambda: self._toggle_password_visibility(self.wiz_gemini_key, self.btn_show_gemini))
+        
+        gemini_row = QHBoxLayout()
+        gemini_row.addWidget(self.wiz_gemini_key)
+        gemini_row.addWidget(self.btn_show_gemini)
+        gemini_widget = QWidget()
+        gemini_widget.setLayout(gemini_row)
         
         # Local settings for setup wizard needed? Maybe basic ones.
-        self.lbl_local_note = QLabel("Local Whisper requires 'faster-whisper' installed. Model default: large-v3.")
+        self.lbl_local_note = QLabel("ℹ️ Local Whisper requires 'faster-whisper' installed. Model default: large-v3.")
         self.lbl_local_note.setWordWrap(True)
+        self.lbl_local_note.setStyleSheet("padding: 12px; background-color: #e3f2fd; border-radius: 4px; color: #1976d2;")
 
-        form.addRow("AI Provider", self.wiz_provider)
-        form.addRow("Gemini Model", self.wiz_gemini_model)
-        form.addRow("Groq API Key", self.wiz_groq_key)
-        form.addRow("Gemini API Key", self.wiz_gemini_key)
-        form.addRow(self.lbl_local_note)
+        form.addRow("AI Provider:", self.wiz_provider)
+        form.addRow("Gemini Model:", self.wiz_gemini_model)
+        form.addRow("Groq API Key:", groq_widget)
+        form.addRow("Gemini API Key:", gemini_widget)
+        form.addRow("", self.lbl_local_note)
 
-        w.setLayout(form)
+        layout.addLayout(form)
+        layout.addStretch(1)
+        w.setLayout(layout)
         self.pages.addWidget(w)
+    
+    def _toggle_password_visibility(self, line_edit, button):
+        """Toggle password visibility for API key fields"""
+        if button.isChecked():
+            line_edit.setEchoMode(QLineEdit.EchoMode.Normal)
+            button.setText("🙈")
+        else:
+            line_edit.setEchoMode(QLineEdit.EchoMode.Password)
+            button.setText("👁️")
 
     def _build_page_device(self):
         w = QWidget()
         layout = QVBoxLayout()
+        layout.setSpacing(20)
+        layout.setContentsMargins(40, 40, 40, 40)
+        
+        title = QLabel("🎙️ Microphone Configuration")
+        title.setStyleSheet("font-size: 20px; font-weight: bold; color: #4285F4; margin-bottom: 20px;")
+        layout.addWidget(title)
+        
+        device_label = QLabel("Input Device:")
+        device_label.setStyleSheet("font-weight: bold; font-size: 13px;")
+        layout.addWidget(device_label)
+        
         top = QHBoxLayout()
+        top.setSpacing(10)
         self.wiz_input_device = QComboBox()
-        self.btn_refresh_devices = QPushButton("Refresh")
+        self.btn_refresh_devices = QPushButton("🔄 Refresh")
         self.btn_refresh_devices.clicked.connect(self._refresh_devices)
-        top.addWidget(QLabel("Input Device"))
         top.addWidget(self.wiz_input_device, 1)
         top.addWidget(self.btn_refresh_devices)
         layout.addLayout(top)
         
+        layout.addSpacing(30)
+        
+        test_label = QLabel("Microphone Test:")
+        test_label.setStyleSheet("font-weight: bold; font-size: 13px; margin-top: 10px;")
+        layout.addWidget(test_label)
+        
         mic_row = QHBoxLayout()
-        self.btn_mic_test = QPushButton("Start Mic Test")
+        mic_row.setSpacing(10)
+        self.btn_mic_test = QPushButton("▶️ Start Mic Test")
         self.mic_bar = QProgressBar()
         self.mic_bar.setRange(0, 100)
+        self.mic_bar.setStyleSheet("""
+            QProgressBar {
+                height: 25px;
+                border: 2px solid #ddd;
+                border-radius: 4px;
+                text-align: center;
+                background-color: #f0f0f0;
+            }
+            QProgressBar::chunk {
+                background-color: #4285F4;
+                border-radius: 2px;
+            }
+        """)
         self.btn_mic_test.clicked.connect(self._toggle_mic_test)
         mic_row.addWidget(self.btn_mic_test)
-        mic_row.addWidget(self.mic_bar)
+        mic_row.addWidget(self.mic_bar, 1)
         layout.addLayout(mic_row)
+        
         layout.addStretch(1)
         w.setLayout(layout)
         self.pages.addWidget(w)
 
     def _build_page_controls(self):
         w = QWidget()
+        layout = QVBoxLayout()
+        layout.setSpacing(20)
+        layout.setContentsMargins(40, 40, 40, 40)
+        
+        title = QLabel("⌨️ Control Settings")
+        title.setStyleSheet("font-size: 20px; font-weight: bold; color: #4285F4; margin-bottom: 20px;")
+        layout.addWidget(title)
+        
         form = QFormLayout()
+        form.setSpacing(15)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        
         self.wiz_hold_key = QComboBox()
         for k, v in [("Left Alt", "alt_l"), ("Right Alt", "alt_r"), ("Left Ctrl", "ctrl_l"), ("Right Ctrl", "ctrl_r")]:
              self.wiz_hold_key.addItem(k, v)
@@ -138,20 +303,35 @@ class SetupWizardDialog(QDialog):
         self.wiz_max_record_seconds.setRange(5, 600)
         self.wiz_max_record_seconds.setSuffix(" s")
         
-        self.wiz_auto_paste = QCheckBox("Paste automatically")
+        self.wiz_auto_paste = QCheckBox("Automatically paste transcribed text")
+        self.wiz_auto_paste.setStyleSheet("padding: 5px;")
         
-        form.addRow("Hold Key", self.wiz_hold_key)
-        form.addRow("Max Recording", self.wiz_max_record_seconds)
-        form.addRow("Auto Paste", self.wiz_auto_paste)
-        w.setLayout(form)
+        form.addRow("Hold Key:", self.wiz_hold_key)
+        form.addRow("Max Recording Time:", self.wiz_max_record_seconds)
+        form.addRow("", self.wiz_auto_paste)
+        
+        layout.addLayout(form)
+        layout.addStretch(1)
+        w.setLayout(layout)
         self.pages.addWidget(w)
 
     def _build_page_finish(self):
         w = QWidget()
         layout = QVBoxLayout()
-        title = QLabel("Finish")
-        title.setStyleSheet("font-size: 18px; font-weight: bold;")
-        self.lbl_finish = QLabel("Click Finish to save settings and start using Voice In.")
+        layout.setSpacing(20)
+        layout.setContentsMargins(40, 40, 40, 40)
+        
+        title = QLabel("✅ Setup Complete!")
+        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #4285F4; margin-bottom: 20px;")
+        
+        self.lbl_finish = QLabel(
+            "All settings have been configured.\n\n"
+            "Click 'Finish' to save your settings and start using Voice In.\n\n"
+            "You can change these settings anytime from the system tray menu."
+        )
+        self.lbl_finish.setWordWrap(True)
+        self.lbl_finish.setStyleSheet("font-size: 14px; color: #333; line-height: 1.6; padding: 20px; background-color: white; border-radius: 8px;")
+        
         layout.addWidget(title)
         layout.addWidget(self.lbl_finish)
         layout.addStretch(1)
