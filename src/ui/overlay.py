@@ -8,7 +8,7 @@ import logging
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QLabel, QApplication, QSystemTrayIcon, QMenu
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QThread, QObject
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QThread, QObject, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QAction
 from pynput import keyboard
 
@@ -44,6 +44,8 @@ class AquaOverlay(QMainWindow):
         self._ai_worker = None
         self._is_processing = False
         self._status = "idle"
+        self._pulse_timer = None
+        self._pulse_animation = None
         
         self.initUI()
         self.initKeyboard()
@@ -80,8 +82,13 @@ class AquaOverlay(QMainWindow):
         layout.setContentsMargins(0,0,0,0)
         self.widget.setLayout(layout)
         self.setCentralWidget(self.widget)
-        self.setWindowOpacity(0.8)
+        self.setWindowOpacity(0.85)
         self.setToolTip(t("tooltip_hold_key"))
+        
+        # Initialize pulse animation for recording state
+        self._pulse_animation = QPropertyAnimation(self, b"windowOpacity")
+        self._pulse_animation.setDuration(800)
+        self._pulse_animation.setEasingCurve(QEasingCurve.Type.InOutSine)
 
         # Dragging logic... (omitted for brevity, can implement if needed or copy from original)
         self._dragging = False
@@ -119,16 +126,20 @@ class AquaOverlay(QMainWindow):
         provider = os.getenv("AI_PROVIDER", "gemini")
         color = "#4285F4" if provider == "gemini" else "#f55036" if provider == "groq" else "#888888" # Local gray?
         
+        # Enhanced styling with gradient and shadow effect
         self.widget.setStyleSheet(f"""
             QWidget {{
-                background-color: rgba(50, 50, 50, 200);
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(60, 60, 60, 220),
+                    stop:1 rgba(40, 40, 40, 220));
                 border-radius: 30px;
                 border: 2px solid {color};
             }}
             QLabel {{
                 color: white;
                 font-weight: bold;
-                font-size: 24px;
+                font-size: 26px;
+                background: transparent;
             }}
         """)
         
@@ -174,9 +185,27 @@ class AquaOverlay(QMainWindow):
         if self.recorder.is_recording or self._is_processing: return
         self._set_status("recording")
         self.label.setText("🎙️")
+        
+        # Enhanced recording style with gradient
         self.widget.setStyleSheet("""
-            QWidget { background-color: rgba(220, 20, 60, 230); border-radius: 30px; border: 2px solid #ff9999; }
+            QWidget {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(220, 20, 60, 240),
+                    stop:1 rgba(180, 10, 40, 240));
+                border-radius: 30px;
+                border: 2px solid #ff6b6b;
+            }
+            QLabel {
+                color: white;
+                font-weight: bold;
+                font-size: 26px;
+                background: transparent;
+            }
         """)
+        
+        # Start pulse animation
+        self._start_pulse_animation(0.85, 1.0)
+        
         max_sec = config_manager.settings.get("audio", {}).get("max_record_seconds", 60)
         
         def on_auto_stop():
@@ -206,8 +235,25 @@ class AquaOverlay(QMainWindow):
 
         self._set_status("processing")
         self.label.setText("⏳")
+        
+        # Stop pulse animation
+        self._stop_pulse_animation()
+        
+        # Enhanced processing style with gradient
         self.widget.setStyleSheet("""
-             QWidget { background-color: rgba(255, 193, 7, 230); border-radius: 30px; border: 2px solid #ffeabe; }
+            QWidget {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(255, 193, 7, 240),
+                    stop:1 rgba(230, 170, 0, 240));
+                border-radius: 30px;
+                border: 2px solid #ffd93d;
+            }
+            QLabel {
+                color: white;
+                font-weight: bold;
+                font-size: 26px;
+                background: transparent;
+            }
         """)
         self._is_processing = True
         
@@ -244,6 +290,23 @@ class AquaOverlay(QMainWindow):
         
         self.label.setText("✅")
         self._set_status("success")
+        
+        # Enhanced success style
+        self.widget.setStyleSheet("""
+            QWidget {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(46, 204, 113, 240),
+                    stop:1 rgba(35, 160, 90, 240));
+                border-radius: 30px;
+                border: 2px solid #4ade80;
+            }
+            QLabel {
+                color: white;
+                font-weight: bold;
+                font-size: 26px;
+                background: transparent;
+            }
+        """)
         self.reset_ui_delayed()
 
     def do_paste(self):
@@ -288,15 +351,34 @@ class AquaOverlay(QMainWindow):
     def on_ai_error(self, err):
         self.label.setText("❌")
         self._set_status("error")
+        self._stop_pulse_animation()
+        
+        # Enhanced error style
+        self.widget.setStyleSheet("""
+            QWidget {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(176, 0, 32, 240),
+                    stop:1 rgba(140, 0, 20, 240));
+                border-radius: 30px;
+                border: 2px solid #ef4444;
+            }
+            QLabel {
+                color: white;
+                font-weight: bold;
+                font-size: 26px;
+                background: transparent;
+            }
+        """)
         print(f"AI Error: {err}")
         self.reset_ui_delayed()
 
     def reset_ui(self):
         self._is_processing = False
+        self._stop_pulse_animation()
         self.update_style()
         self.label.setText("🎤")
         self._set_status("idle")
-        self.setWindowOpacity(0.8)
+        self.setWindowOpacity(0.85)
 
     def reset_ui_delayed(self):
         QTimer.singleShot(1000, self.reset_ui)
@@ -318,6 +400,33 @@ class AquaOverlay(QMainWindow):
              self._setup_dialog = SetupWizardDialog(self)
         self._setup_dialog.show()
     
+    def _start_pulse_animation(self, min_opacity=0.7, max_opacity=1.0):
+        """Start pulsing animation for recording state"""
+        if self._pulse_animation:
+            self._pulse_animation.stop()
+        self._pulse_animation.setStartValue(min_opacity)
+        self._pulse_animation.setEndValue(max_opacity)
+        self._pulse_animation.setLoopCount(-1)  # Infinite loop
+        self._pulse_animation.start()
+    
+    def _stop_pulse_animation(self):
+        """Stop pulsing animation"""
+        if self._pulse_animation:
+            self._pulse_animation.stop()
+    
+    def enterEvent(self, event):
+        """Increase opacity on hover"""
+        if self._status == "idle":
+            self.setWindowOpacity(0.95)
+        super().enterEvent(event)
+    
+    def leaveEvent(self, event):
+        """Restore opacity on leave"""
+        if self._status == "idle":
+            self.setWindowOpacity(0.85)
+        super().leaveEvent(event)
+    
     def closeEvent(self, event):
+        self._stop_pulse_animation()
         self.listener.stop()
         event.accept()
