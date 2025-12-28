@@ -529,38 +529,38 @@ class SettingsDialog(QDialog):
         layout.setSpacing(15)
         layout.setContentsMargins(30, 30, 30, 30)
         
-        title = QLabel("🏷️ App Categories")
+        title = QLabel("🏷️ " + t("cat_title"))
         title.setStyleSheet("font-size: 18px; font-weight: bold; color: #4285F4; margin-bottom: 10px;")
         layout.addWidget(title)
         
         # Context-aware toggle
-        self.chk_context_aware = QCheckBox("Enable context-aware prompt optimization")
+        self.chk_context_aware = QCheckBox(t("cat_context_aware"))
         self.chk_context_aware.setStyleSheet("font-weight: bold; padding: 5px;")
         layout.addWidget(self.chk_context_aware)
         
         # Category selector
         cat_row = QHBoxLayout()
-        cat_row.addWidget(QLabel("Category:"))
+        cat_row.addWidget(QLabel(t("cat_category") + ":"))
         self.cmb_category = QComboBox()
-        self.cmb_category.addItems(["DEV - Development", "BIZ - Business", "DOC - Documents", "STD - Standard"])
+        self.cmb_category.addItems([t("cat_dev"), t("cat_biz"), t("cat_doc"), t("cat_std")])
         self.cmb_category.currentIndexChanged.connect(self._on_category_changed)
         cat_row.addWidget(self.cmb_category, 1)
         layout.addLayout(cat_row)
         
         # Keywords list
-        kw_label = QLabel("Keywords (apps matching these will use this category):")
+        kw_label = QLabel(t("cat_keywords_label"))
         kw_label.setStyleSheet("margin-top: 10px;")
         layout.addWidget(kw_label)
         
         self.lst_keywords = QTableWidget(0, 1)
-        self.lst_keywords.setHorizontalHeaderLabels(["Keyword"])
+        self.lst_keywords.setHorizontalHeaderLabels([t("cat_keyword")])
         self.lst_keywords.horizontalHeader().setStretchLastSection(True)
         self.lst_keywords.setMaximumHeight(150)
         layout.addWidget(self.lst_keywords)
         
         kw_btn_row = QHBoxLayout()
-        self.btn_kw_add = QPushButton("+ Add Keyword")
-        self.btn_kw_remove = QPushButton("- Remove")
+        self.btn_kw_add = QPushButton(t("cat_add_keyword"))
+        self.btn_kw_remove = QPushButton(t("cat_remove"))
         self.btn_kw_add.clicked.connect(self._on_keyword_add)
         self.btn_kw_remove.clicked.connect(self._on_keyword_remove)
         kw_btn_row.addWidget(self.btn_kw_add)
@@ -569,7 +569,7 @@ class SettingsDialog(QDialog):
         layout.addLayout(kw_btn_row)
         
         # Category prompt
-        prompt_label = QLabel("Category Prompt (used when this category is detected):")
+        prompt_label = QLabel(t("cat_prompt_label"))
         prompt_label.setStyleSheet("margin-top: 15px;")
         layout.addWidget(prompt_label)
         
@@ -579,20 +579,20 @@ class SettingsDialog(QDialog):
         layout.addWidget(self.txt_category_prompt)
         
         # Detected apps section
-        detected_label = QLabel("📋 Detected Apps History")
+        detected_label = QLabel("📋 " + t("cat_detected_apps"))
         detected_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #4285F4; margin-top: 20px;")
         layout.addWidget(detected_label)
         
         self.tbl_detected_apps = QTableWidget(0, 3)
-        self.tbl_detected_apps.setHorizontalHeaderLabels(["App Name", "Auto Category", "Assigned Category"])
+        self.tbl_detected_apps.setHorizontalHeaderLabels([t("cat_app_name"), t("cat_auto_category"), t("cat_assigned_category")])
         self.tbl_detected_apps.horizontalHeader().setStretchLastSection(True)
         self.tbl_detected_apps.setMaximumHeight(180)
         layout.addWidget(self.tbl_detected_apps)
         
         detected_btn_row = QHBoxLayout()
-        self.btn_assign_category = QPushButton("Assign to Category")
+        self.btn_assign_category = QPushButton(t("cat_assign"))
         self.btn_assign_category.clicked.connect(self._on_assign_category)
-        self.btn_clear_detected = QPushButton("Clear History")
+        self.btn_clear_detected = QPushButton(t("cat_clear_history"))
         self.btn_clear_detected.clicked.connect(self._on_clear_detected)
         detected_btn_row.addWidget(self.btn_assign_category)
         detected_btn_row.addWidget(self.btn_clear_detected)
@@ -601,7 +601,7 @@ class SettingsDialog(QDialog):
         
         layout.addStretch(1)
         w.setLayout(layout)
-        self.tabs.addTab(w, "🏷️ Categories")
+        self.tabs.addTab(w, "🏷️ " + t("tab_categories"))
         
         # Initialize category data cache
         self._category_data = {}
@@ -743,13 +743,13 @@ class SettingsDialog(QDialog):
         if self._get_category_id() == new_category:
             self._load_category_to_ui(new_category)
         
-        QMessageBox.information(self, "Category Assigned", 
-            f"'{app_name}' has been added to {new_category} category keywords.")
+        QMessageBox.information(self, t("cat_assign"), 
+            t("cat_assigned_msg", app=app_name, category=new_category))
 
     def _on_clear_detected(self):
         """Clear detected apps history"""
-        reply = QMessageBox.question(self, "Clear History", 
-            "Clear all detected apps history?",
+        reply = QMessageBox.question(self, t("cat_clear_history"), 
+            t("cat_clear_confirm"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
         if reply == QMessageBox.StandardButton.Yes:
