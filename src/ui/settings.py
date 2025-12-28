@@ -182,6 +182,7 @@ class SettingsDialog(QDialog):
         self._build_general_tab()
         self._build_prompts_tab()
         self._build_dictionary_tab()
+        self._build_categories_tab()
         self._build_history_tab()
 
         self.btn_save_apply = QPushButton(t("settings_save_apply"))
@@ -521,6 +522,240 @@ class SettingsDialog(QDialog):
         w.setLayout(layout)
         self.tabs.addTab(w, t("tab_dictionary"))
 
+    def _build_categories_tab(self):
+        """Build app categories configuration tab"""
+        w = QWidget()
+        layout = QVBoxLayout()
+        layout.setSpacing(15)
+        layout.setContentsMargins(30, 30, 30, 30)
+        
+        title = QLabel("🏷️ App Categories")
+        title.setStyleSheet("font-size: 18px; font-weight: bold; color: #4285F4; margin-bottom: 10px;")
+        layout.addWidget(title)
+        
+        # Context-aware toggle
+        self.chk_context_aware = QCheckBox("Enable context-aware prompt optimization")
+        self.chk_context_aware.setStyleSheet("font-weight: bold; padding: 5px;")
+        layout.addWidget(self.chk_context_aware)
+        
+        # Category selector
+        cat_row = QHBoxLayout()
+        cat_row.addWidget(QLabel("Category:"))
+        self.cmb_category = QComboBox()
+        self.cmb_category.addItems(["DEV - Development", "BIZ - Business", "DOC - Documents", "STD - Standard"])
+        self.cmb_category.currentIndexChanged.connect(self._on_category_changed)
+        cat_row.addWidget(self.cmb_category, 1)
+        layout.addLayout(cat_row)
+        
+        # Keywords list
+        kw_label = QLabel("Keywords (apps matching these will use this category):")
+        kw_label.setStyleSheet("margin-top: 10px;")
+        layout.addWidget(kw_label)
+        
+        self.lst_keywords = QTableWidget(0, 1)
+        self.lst_keywords.setHorizontalHeaderLabels(["Keyword"])
+        self.lst_keywords.horizontalHeader().setStretchLastSection(True)
+        self.lst_keywords.setMaximumHeight(150)
+        layout.addWidget(self.lst_keywords)
+        
+        kw_btn_row = QHBoxLayout()
+        self.btn_kw_add = QPushButton("+ Add Keyword")
+        self.btn_kw_remove = QPushButton("- Remove")
+        self.btn_kw_add.clicked.connect(self._on_keyword_add)
+        self.btn_kw_remove.clicked.connect(self._on_keyword_remove)
+        kw_btn_row.addWidget(self.btn_kw_add)
+        kw_btn_row.addWidget(self.btn_kw_remove)
+        kw_btn_row.addStretch(1)
+        layout.addLayout(kw_btn_row)
+        
+        # Category prompt
+        prompt_label = QLabel("Category Prompt (used when this category is detected):")
+        prompt_label.setStyleSheet("margin-top: 15px;")
+        layout.addWidget(prompt_label)
+        
+        self.txt_category_prompt = QPlainTextEdit()
+        self.txt_category_prompt.setMaximumHeight(120)
+        self.txt_category_prompt.textChanged.connect(self._on_category_prompt_changed)
+        layout.addWidget(self.txt_category_prompt)
+        
+        # Detected apps section
+        detected_label = QLabel("📋 Detected Apps History")
+        detected_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #4285F4; margin-top: 20px;")
+        layout.addWidget(detected_label)
+        
+        self.tbl_detected_apps = QTableWidget(0, 3)
+        self.tbl_detected_apps.setHorizontalHeaderLabels(["App Name", "Auto Category", "Assigned Category"])
+        self.tbl_detected_apps.horizontalHeader().setStretchLastSection(True)
+        self.tbl_detected_apps.setMaximumHeight(180)
+        layout.addWidget(self.tbl_detected_apps)
+        
+        detected_btn_row = QHBoxLayout()
+        self.btn_assign_category = QPushButton("Assign to Category")
+        self.btn_assign_category.clicked.connect(self._on_assign_category)
+        self.btn_clear_detected = QPushButton("Clear History")
+        self.btn_clear_detected.clicked.connect(self._on_clear_detected)
+        detected_btn_row.addWidget(self.btn_assign_category)
+        detected_btn_row.addWidget(self.btn_clear_detected)
+        detected_btn_row.addStretch(1)
+        layout.addLayout(detected_btn_row)
+        
+        layout.addStretch(1)
+        w.setLayout(layout)
+        self.tabs.addTab(w, "🏷️ Categories")
+        
+        # Initialize category data cache
+        self._category_data = {}
+        self._current_category = "DEV"
+
+    def _get_category_id(self) -> str:
+        """Get current category ID from combo box"""
+        text = self.cmb_category.currentText()
+        return text.split(" - ")[0] if " - " in text else "STD"
+
+    def _on_category_changed(self):
+        """Handle category selection change"""
+        # Save current category data first
+        self._save_current_category_to_cache()
+        
+        # Load new category data
+        cat_id = self._get_category_id()
+        self._current_category = cat_id
+        self._load_category_to_ui(cat_id)
+
+    def _save_current_category_to_cache(self):
+        """Save current UI state to cache"""
+        cat_id = self._current_category
+        
+        # Save keywords
+        keywords = []
+        for row in range(self.lst_keywords.rowCount()):
+            item = self.lst_keywords.item(row, 0)
+            if item and item.text().strip():
+                keywords.append(item.text().strip())
+        
+        if cat_id not in self._category_data:
+            self._category_data[cat_id] = {}
+        self._category_data[cat_id]["keywords"] = keywords
+        self._category_data[cat_id]["prompt"] = self.txt_category_prompt.toPlainText()
+
+    def _load_category_to_ui(self, cat_id: str):
+        """Load category data to UI"""
+        # Get from cache or config
+        if cat_id in self._category_data:
+            data = self._category_data[cat_id]
+            keywords = data.get("keywords", [])
+            prompt = data.get("prompt", "")
+        else:
+            # Load from config
+            app_categories = config_manager.settings.get("app_categories", {})
+            category_prompts = config_manager.settings.get("category_prompts", {})
+            keywords = app_categories.get(cat_id, [])
+            prompt = category_prompts.get(cat_id, "")
+        
+        # Update keywords list
+        self.lst_keywords.setRowCount(0)
+        for kw in keywords:
+            row = self.lst_keywords.rowCount()
+            self.lst_keywords.insertRow(row)
+            self.lst_keywords.setItem(row, 0, QTableWidgetItem(kw))
+        
+        # Update prompt (block signals to avoid recursion)
+        self.txt_category_prompt.blockSignals(True)
+        self.txt_category_prompt.setPlainText(prompt)
+        self.txt_category_prompt.blockSignals(False)
+
+    def _on_category_prompt_changed(self):
+        """Handle category prompt text change"""
+        cat_id = self._current_category
+        if cat_id not in self._category_data:
+            self._category_data[cat_id] = {}
+        self._category_data[cat_id]["prompt"] = self.txt_category_prompt.toPlainText()
+
+    def _on_keyword_add(self):
+        """Add a new keyword row"""
+        row = self.lst_keywords.rowCount()
+        self.lst_keywords.insertRow(row)
+        self.lst_keywords.setItem(row, 0, QTableWidgetItem(""))
+        self.lst_keywords.editItem(self.lst_keywords.item(row, 0))
+
+    def _on_keyword_remove(self):
+        """Remove selected keyword"""
+        row = self.lst_keywords.currentRow()
+        if row >= 0:
+            self.lst_keywords.removeRow(row)
+
+    def _load_detected_apps(self):
+        """Load detected apps to table"""
+        self.tbl_detected_apps.setRowCount(0)
+        detected_apps = config_manager.settings.get("detected_apps", {})
+        
+        for app_name, info in detected_apps.items():
+            if not isinstance(info, dict):
+                continue
+            row = self.tbl_detected_apps.rowCount()
+            self.tbl_detected_apps.insertRow(row)
+            self.tbl_detected_apps.setItem(row, 0, QTableWidgetItem(app_name))
+            self.tbl_detected_apps.setItem(row, 1, QTableWidgetItem(info.get("auto_category", "STD")))
+            
+            # Create combo box for category assignment
+            cmb = QComboBox()
+            cmb.addItems(["DEV", "BIZ", "DOC", "STD"])
+            user_cat = info.get("user_category") or info.get("auto_category", "STD")
+            idx = cmb.findText(user_cat)
+            if idx >= 0:
+                cmb.setCurrentIndex(idx)
+            self.tbl_detected_apps.setCellWidget(row, 2, cmb)
+
+    def _on_assign_category(self):
+        """Assign selected app to a category (adds as keyword)"""
+        row = self.tbl_detected_apps.currentRow()
+        if row < 0:
+            return
+        
+        app_name = self.tbl_detected_apps.item(row, 0).text()
+        cmb = self.tbl_detected_apps.cellWidget(row, 2)
+        if not cmb:
+            return
+        
+        new_category = cmb.currentText()
+        
+        # Update detected_apps config
+        detected_apps = config_manager.settings.get("detected_apps", {})
+        if app_name in detected_apps:
+            detected_apps[app_name]["user_category"] = new_category
+        
+        # Add app name as keyword to the category
+        app_categories = config_manager.settings.get("app_categories", {})
+        if new_category not in app_categories:
+            app_categories[new_category] = []
+        
+        # Add lowercase app name if not already present
+        app_lower = app_name.lower()
+        if app_lower not in [k.lower() for k in app_categories[new_category]]:
+            app_categories[new_category].append(app_lower)
+        
+        config_manager.update_settings({
+            "detected_apps": detected_apps,
+            "app_categories": app_categories
+        })
+        
+        # Refresh category UI if current category matches
+        if self._get_category_id() == new_category:
+            self._load_category_to_ui(new_category)
+        
+        QMessageBox.information(self, "Category Assigned", 
+            f"'{app_name}' has been added to {new_category} category keywords.")
+
+    def _on_clear_detected(self):
+        """Clear detected apps history"""
+        reply = QMessageBox.question(self, "Clear History", 
+            "Clear all detected apps history?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            config_manager.update_settings({"detected_apps": {}})
+            self._load_detected_apps()
+
     def _build_history_tab(self):
         """Build history tab similar to HistoryDialog"""
         w = QWidget()
@@ -722,6 +957,13 @@ class SettingsDialog(QDialog):
         self.cmb_local_device.setCurrentText(loc.get("device", "cuda"))
         self.cmb_local_compute.setCurrentText(loc.get("compute_type", "float16"))
         
+        # Categories
+        self.chk_context_aware.setChecked(settings.get("context_aware_enabled", True))
+        self._category_data = {}  # Reset cache
+        self._current_category = "DEV"
+        self._load_category_to_ui("DEV")
+        self._load_detected_apps()
+        
         self.on_refresh_input_devices()
         current_dev = audio.get("input_device")
         idx = self.cmb_input_device.findData(current_dev)
@@ -802,8 +1044,25 @@ class SettingsDialog(QDialog):
                 "model_size": self.cmb_local_size.currentText(),
                 "device": self.cmb_local_device.currentText(),
                 "compute_type": self.cmb_local_compute.currentText()
-            }
+            },
+            "context_aware_enabled": self.chk_context_aware.isChecked()
         }
+        
+        # Save current category to cache before collecting all
+        self._save_current_category_to_cache()
+        
+        # Build app_categories and category_prompts from cache
+        app_categories = config_manager.settings.get("app_categories", {})
+        category_prompts = config_manager.settings.get("category_prompts", {})
+        
+        for cat_id, data in self._category_data.items():
+            if "keywords" in data:
+                app_categories[cat_id] = data["keywords"]
+            if "prompt" in data and data["prompt"].strip():
+                category_prompts[cat_id] = data["prompt"]
+        
+        new_settings["app_categories"] = app_categories
+        new_settings["category_prompts"] = category_prompts
         
         config_manager.update_settings(new_settings)
         self.settings_applied.emit(config_manager.settings)

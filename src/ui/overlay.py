@@ -15,6 +15,8 @@ from pynput import keyboard
 from src.core.config import config_manager
 from src.core.i18n import t
 from src.core.history import append_history_item
+from src.core.window_detector import get_active_window
+from src.core.context_prompt import generate_context_prompt, add_detected_app
 from src.audio.recorder import AudioRecorder
 from src.audio.vad import SimpleVAD
 from src.ai.worker import AIWorker
@@ -259,6 +261,24 @@ class AquaOverlay(QMainWindow):
         
         provider = os.getenv("AI_PROVIDER", "gemini")
         prompts = config_manager.settings.get("prompts", {})
+        
+        # Context-aware prompt optimization
+        if config_manager.settings.get("context_aware_enabled", True):
+            try:
+                window_info = get_active_window()
+                window_title = window_info.get("title", "")
+                app_name = window_info.get("app_name", "")
+                
+                if window_title:
+                    # Generate context-aware prompts
+                    prompts = generate_context_prompt(window_title, prompts)
+                    logging.info(f"Context: {app_name} -> Category: {prompts.get('_detected_category', 'STD')}")
+                    
+                    # Track detected app for user categorization
+                    if app_name:
+                        add_detected_app(window_title, app_name)
+            except Exception as e:
+                logging.warning(f"Context detection failed, using default prompts: {e}")
         
         self._ai_thread = QThread()
         self._ai_worker = AIWorker(provider, wav_path, prompts)
