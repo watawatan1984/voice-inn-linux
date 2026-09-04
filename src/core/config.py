@@ -58,7 +58,36 @@ DEFAULT_SETTINGS = {
         "model_size": "large-v3",
         "device": "cuda",
         "compute_type": "float16"
-    }
+    },
+    "app_categories": {
+        "DEV": [
+            "code", "terminal", "iterm", "cursor", "intellij", "pycharm", "vim",
+            "neovim", "bash", "powershell", "git", "vscode", "android studio",
+            "xcode", "visual studio", "sublime", "atom", "emacs", "nvim",
+            "cmd", "command prompt", "windows terminal", "warp", "hyper",
+            "rider", "webstorm", "phpstorm", "goland", "clion", "datagrip",
+            "windsurf", "zed", "fleet"
+        ],
+        "BIZ": [
+            "mail", "gmail", "outlook", "slack", "teams", "zoom", "discord",
+            "thunderbird", "chatwork", "line", "messenger", "skype", "webex",
+            "meet", "hangouts"
+        ],
+        "DOC": [
+            "word", "powerpoint", "notion", "obsidian", "memo", "note", "writer",
+            "text", "evernote", "onenote", "typora", "bear", "ulysses", "scrivener",
+            "メモ", "notepad", "textedit", "gedit", "kate", "pages", "docs"
+        ],
+        "STD": []
+    },
+    "category_prompts": {
+        "DEV": "あなたは熟練のプログラマです。\n\n【指示】\n- 入力テキストをコードコメント、コミットメッセージ、または変数名として適切な形式に変換\n- 変数名は snake_case または camelCase を適用\n- ライブラリ名・コマンド名・専門用語は正しい英単語スペルに修正\n- 出力は極めて簡潔に",
+        "BIZ": "あなたは優秀なビジネス秘書です。\n\n【指示】\n- 口語体を丁寧な「ビジネス敬語（です・ます調）」に変換\n- メールやチャットとして適切な形式に整形\n- 文脈に応じて適切な改行を挿入",
+        "DOC": "あなたはプロのライター・編集者です。\n\n【指示】\n- 論理構成を整え、読みやすい「書き言葉」に変換\n- 必要であればMarkdown形式（箇条書き等）を使用\n- 文体を入力の雰囲気に合わせて統一",
+        "STD": "あなたは優秀なテクニカルライターAIです。\n\n【指示】\n- フィラー（えー、あー）を完全に除去\n- IT用語・固有名詞は英単語化（カタカナ禁止）\n- 誤字脱字を修正\n- 自然な日本語の文章に整形"
+    },
+    "detected_apps": {},
+    "context_aware_enabled": True
 }
 
 import copy
