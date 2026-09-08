@@ -18,6 +18,7 @@ graph TB
         SettingsDlg[SettingsDialog <br/> 一般・プロンプト・辞書・カテゴリ設定]
         SetupWizard[SetupWizardDialog <br/> 初回導入ウィザード & モデルDL]
         HistoryDlg[HistoryDialog <br/> 履歴閲覧 & コピー]
+        Styles[styles.py <br/> QSS テーマスタイルシート集中管理]
     end
 
     subgraph App_Layer ["アプリケーション制御 & スレッド管理"]
@@ -27,14 +28,17 @@ graph TB
     end
 
     subgraph Core_Layer ["コアドメイン & ユーティリティ (Python)"]
+        Const[const.py <br/> 定数・既定モデル・プロンプト SSOT]
+        Utils[utils.py <br/> XDG/Win32/macOS パス解決・Atomic Write]
         ConfigMgr[config_manager <br/> settings.json & .env 永続化]
         WinDetector[window_detector.py <br/> xdotool / Win32 アクティブ判定]
-        ContextPrompt[context_prompt.py <br/> DEV/BIZ/DOC/STD プロンプト合成]
+        ContextPrompt[context_prompt.py <br/> DEV/BIZ/DOC/STD プロンプト合成 (単語境界判定)]
         History[history.py <br/> 履歴追加 & 最大件数管理]
         AudioRecorder[AudioRecorder <br/> Python 音声インターフェース]
     end
 
     subgraph AI_Layer ["AI プロバイダ層 (Python)"]
+        AIFactory[AIProviderFactory <br/> get_provider(name)]
         AIProvider[<<base>> AIProvider]
         GeminiProv[GeminiProvider <br/> google-genai SDK]
         GroqProv[GroqProvider <br/> groq SDK: Whisper + LLaMA 3.3]
@@ -49,7 +53,7 @@ graph TB
     end
 
     subgraph OS_Layer ["OS & 外部サービス"]
-        X11[X11 / xdotool <br/> ウィンドウアクティブ & Ctrl+V 注入]
+        X11[X11 / xdotool / Win32 <br/> ウィンドウアクティブ & Ctrl+V 注入]
         CloudGemini[Google Gemini API]
         CloudGroq[Groq Cloud API]
         FileSystem[~/.config/voice-in & ~/.local/state]
@@ -63,8 +67,10 @@ graph TB
     AquaOverlay --> KeyHook
     AquaOverlay --> WinDetector
     AquaOverlay --> ContextPrompt
+    AquaOverlay --> Styles
 
-    AIWorker --> AIProvider
+    AIWorker --> AIFactory
+    AIFactory --> AIProvider
     AIProvider <|-- GeminiProv
     AIProvider <|-- GroqProv
     AIProvider <|-- LocalProv
@@ -79,7 +85,10 @@ graph TB
 
     AquaOverlay --> X11
     ConfigMgr --> FileSystem
+    ConfigMgr --> Const
+    ConfigMgr --> Utils
     History --> FileSystem
+    History --> Utils
 ```
 
 ---
