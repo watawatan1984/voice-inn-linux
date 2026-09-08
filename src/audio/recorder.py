@@ -4,23 +4,26 @@ import time
 import tempfile
 import logging
 
+RUST_CORE_AVAILABLE = False
 try:
     from rust_core import PyAudioRecorder
+    RUST_CORE_AVAILABLE = True
 except ImportError:
-    # Fallback or error if not compiled
-    logging.error("Failed to import rust_core. Make sure to build with maturin.")
-    raise
+    PyAudioRecorder = None
+    logging.warning("rust_core module is not available. Please build it with maturin ('maturin develop').")
 
 from src.core.config import config_manager
 from src.core.const import SAMPLE_RATE
 
-# Assuming Rust uses default device SR which is typically 44100 or 48000 on modern OS?
-# For PoC we use hardcoded guessed SR for duration calc if Rust doesn't return it.
-# Ideally Rust should return used SR.
-# But existing vad.py logic expects duration.
 class AudioRecorder:
     def __init__(self):
+        if not RUST_CORE_AVAILABLE or PyAudioRecorder is None:
+            raise RuntimeError(
+                "AudioRecorder requires 'rust_core', but it is not installed or built. "
+                "Run 'maturin develop' in the voice-in directory."
+            )
         self._native_recorder = PyAudioRecorder()
+
         self._recording_path = None
         self._monitor_thread = None
         self._stop_event = threading.Event()

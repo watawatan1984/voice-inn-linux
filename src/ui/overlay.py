@@ -1,5 +1,6 @@
 import sys
 import os
+import platform
 import shutil
 import subprocess
 import threading
@@ -330,41 +331,34 @@ class AquaOverlay(QMainWindow):
         self.reset_ui_delayed()
 
     def do_paste(self):
-        # Simplified paste logic
+        # プラットフォームに適した貼り付け処理
         delay = config_manager.settings.get("audio", {}).get("paste_delay_ms", 200)
         def _job():
             try:
-                # Release modifiers
+                # 修飾キーの解放
                 for k in [keyboard.Key.alt_l, keyboard.Key.ctrl_l]:
-                    try: self.keyboard_controller.release(k)
-                    except: pass
+                    try:
+                        self.keyboard_controller.release(k)
+                    except Exception:
+                        pass
                 
-                print(f"DEBUG: do_paste - TargetWindow: {self._paste_target_window}, Xdotool: {shutil.which('xdotool')}")
-                cb_text = QApplication.clipboard().text()
-                print(f"DEBUG: Clipboard content before paste: '{cb_text}'")
+                logging.debug(f"do_paste - TargetWindow: {self._paste_target_window}")
                 
-                if shutil.which("xdotool") and self._paste_target_window:
-                     # Check if we really need to activate (avoid redundant focus events that might reset cursor)
-                     active_now = subprocess.run(["xdotool", "getactivewindow"], capture_output=True, text=True).stdout.strip()
-                     if active_now != self._paste_target_window:
-                         print(f"DEBUG: Activating window (Current: {active_now} != Target: {self._paste_target_window})")
-                         r1 = subprocess.run(["xdotool", "windowactivate", "--sync", self._paste_target_window], capture_output=True, text=True)
-                         print(f"DEBUG: activate ret={r1.returncode}, err={r1.stderr}")
-                     else:
-                         print("DEBUG: Window already active, skipping activate")
-                         
-                     # Force a small sleep to ensure modifiers are clear and focus is stable
-                     # time.sleep(0.1) -> handled by QTimer delay usually, but maybe helpful?
-                     
-                     r2 = subprocess.run(["xdotool", "key", "--clearmodifiers", "ctrl+v"], capture_output=True, text=True)
-                     print(f"DEBUG: key ret={r2.returncode}, err={r2.stderr}")
+                # Linux かつ xdotool が利用可能な場合
+                if platform.system() == "Linux" and shutil.which("xdotool") and self._paste_target_window:
+                    active_now = subprocess.run(["xdotool", "getactivewindow"], capture_output=True, text=True).stdout.strip()
+                    if active_now != self._paste_target_window:
+                        logging.debug(f"Activating window (Current: {active_now} != Target: {self._paste_target_window})")
+                        subprocess.run(["xdotool", "windowactivate", "--sync", self._paste_target_window], capture_output=True, text=True)
+                    subprocess.run(["xdotool", "key", "--clearmodifiers", "ctrl+v"], capture_output=True, text=True)
                 else:
-                     print("DEBUG: Fallback to pynput paste")
-                     with self.keyboard_controller.pressed(keyboard.Key.ctrl):
-                         self.keyboard_controller.press('v')
-                         self.keyboard_controller.release('v')
+                    # Windows / macOS / フォールバック: pynput で Ctrl+V / Cmd+V
+                    modifier = keyboard.Key.cmd if platform.system() == "Darwin" else keyboard.Key.ctrl
+                    with self.keyboard_controller.pressed(modifier):
+                        self.keyboard_controller.press('v')
+                        self.keyboard_controller.release('v')
             except Exception as e:
-                print(f"Paste failed: {e}")
+                logging.error(f"Paste failed: {e}")
                 
         QTimer.singleShot(delay, _job)
 
@@ -389,7 +383,7 @@ class AquaOverlay(QMainWindow):
                 background: transparent;
             }
         """)
-        print(f"AI Error: {err}")
+        logging.error(f"AI Error: {err}")
         self.reset_ui_delayed()
 
     def reset_ui(self):
@@ -405,20 +399,27 @@ class AquaOverlay(QMainWindow):
 
     def open_settings(self):
         if not self._settings_dialog:
-             self._settings_dialog = SettingsDialog(self)
-             self._settings_dialog.settings_applied.connect(lambda s: self.update_style()) # Refresh style on save
+            self._settings_dialog = SettingsDialog(self)
+            self._settings_dialog.settings_applied.connect(lambda s: self.update_style())
         self._settings_dialog.show()
+        self._settings_dialog.raise_()
+        self._settings_dialog.activateWindow()
 
     def show_history(self):
         if not self._history_dialog:
-             self._history_dialog = HistoryDialog(self)
+            self._history_dialog = HistoryDialog(self)
         self._history_dialog.reload()
         self._history_dialog.show()
+        self._history_dialog.raise_()
+        self._history_dialog.activateWindow()
 
     def open_setup_wizard(self):
         if not self._setup_dialog:
-             self._setup_dialog = SetupWizardDialog(self)
+            self._setup_dialog = SetupWizardDialog(self)
         self._setup_dialog.show()
+        self._setup_dialog.raise_()
+        self._setup_dialog.activateWindow()
+
     
     def _start_pulse_animation(self, min_opacity=0.7, max_opacity=1.0):
         """Start pulsing animation for recording state"""

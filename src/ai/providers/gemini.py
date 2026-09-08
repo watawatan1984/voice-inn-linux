@@ -2,31 +2,34 @@ import os
 import logging
 import mimetypes
 
-try:
-    from google import genai
-    from google.genai import types
-except ImportError:
-    # Fail fast with helpful message if package is missing
-    raise ImportError("The 'google-genai' package is required. Please install it via pip or uv.")
-
 from src.core.config import config_manager
+from src.core.const import DEFAULT_GEMINI_MODEL
 from src.ai.providers.base import AIProvider
 
 class GeminiProvider(AIProvider):
     def __init__(self):
+        try:
+            from google import genai
+            from google.genai import types
+            self._types = types
+            self._genai = genai
+        except ImportError:
+            raise ImportError("The 'google-genai' package is required. Please install it via pip or uv.")
+
         self.api_key = config_manager.settings.get("gemini_key") or os.getenv("GEMINI_API_KEY")
         self.client = None
         if self.api_key:
             try:
-                self.client = genai.Client(api_key=self.api_key)
+                self.client = self._genai.Client(api_key=self.api_key)
             except Exception:
                 logging.exception("Error configuring Gemini Client")
+
 
     def transcribe(self, audio_path: str, prompts: dict) -> str:
         if not self.client:
              raise RuntimeError("Gemini Client not initialized (Check API Key)")
 
-        model_name = config_manager.settings.get("gemini_model") or os.getenv("GEMINI_MODEL") or "gemini-2.0-flash" 
+        model_name = config_manager.settings.get("gemini_model") or os.getenv("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL 
         
         prompt_text = prompts.get("gemini_transcribe_prompt", "")
 
@@ -43,14 +46,14 @@ class GeminiProvider(AIProvider):
             response = self.client.models.generate_content(
                 model=model_name,
                 contents=[
-                    types.Content(
+                    self._types.Content(
                         parts=[
-                            types.Part.from_bytes(data=audio_bytes, mime_type=mime_type),
-                            types.Part.from_text(text=prompt_text)
+                            self._types.Part.from_bytes(data=audio_bytes, mime_type=mime_type),
+                            self._types.Part.from_text(text=prompt_text)
                         ]
                     )
                 ],
-                config=types.GenerateContentConfig(temperature=0.0)
+                config=self._types.GenerateContentConfig(temperature=0.0)
             )
             
             if response.text:

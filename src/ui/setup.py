@@ -12,73 +12,16 @@ import threading
 from src.core.config import config_manager
 from src.core.i18n import t
 from src.core.const import SAMPLE_RATE, SUPPORTED_LANGUAGES
+from src.ui.styles import COMMON_DIALOG_STYLESHEET, DANGER_BUTTON_STYLE
 
 class SetupWizardDialog(QDialog):
-    from PyQt6.QtCore import pyqtSignal
     settings_applied = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Voice In - Setup Wizard")
         self.setMinimumSize(900, 600)
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #f5f5f5;
-            }
-            QLabel {
-                color: #333;
-            }
-            QPushButton {
-                background-color: #4285F4;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 4px;
-                font-weight: bold;
-                min-width: 80px;
-            }
-            QPushButton:hover {
-                background-color: #357ae8;
-            }
-            QPushButton:pressed {
-                background-color: #2d6fc7;
-            }
-            QPushButton:disabled {
-                background-color: #cccccc;
-                color: #666666;
-            }
-            QLineEdit, QComboBox, QSpinBox {
-                padding: 6px;
-                border: 2px solid #ddd;
-                border-radius: 4px;
-                background-color: white;
-                font-size: 13px;
-            }
-            QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
-                border: 2px solid #4285F4;
-            }
-            QLineEdit:disabled {
-                background-color: #f5f5f5;
-                color: #999;
-            }
-            QLineEdit[readOnly="true"] {
-                background-color: #f5f5f5;
-                color: #999;
-            }
-            QComboBox::drop-down {
-                border: none;
-            }
-            QProgressBar {
-                border: 2px solid #ddd;
-                border-radius: 4px;
-                text-align: center;
-                background-color: #f0f0f0;
-            }
-            QProgressBar::chunk {
-                background-color: #4285F4;
-                border-radius: 2px;
-            }
-        """)
+        self.setStyleSheet(COMMON_DIALOG_STYLESHEET)
 
         self._audio_lock = threading.Lock()
         self._mic_level = 0.0
@@ -95,14 +38,8 @@ class SetupWizardDialog(QDialog):
         self.btn_back = QPushButton(t("setup_back"))
         self.btn_next = QPushButton(t("setup_next"))
         self.btn_cancel = QPushButton(t("setup_cancel"))
-        self.btn_cancel.setStyleSheet("""
-            QPushButton {
-                background-color: #f44336;
-            }
-            QPushButton:hover {
-                background-color: #d32f2f;
-            }
-        """)
+        self.btn_cancel.setStyleSheet(DANGER_BUTTON_STYLE)
+
         self.btn_back.clicked.connect(self._back)
         self.btn_next.clicked.connect(self._next)
         self.btn_cancel.clicked.connect(self.close)

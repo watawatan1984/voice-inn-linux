@@ -7,96 +7,31 @@ dynamic system prompts optimized for each context.
 
 from typing import Optional
 from src.core.config import config_manager
+from src.core.const import (
+    DEFAULT_APP_CATEGORIES,
+    DEFAULT_CATEGORY_PROMPTS
+)
+
+# 後方互換性のためのエイリアス
+DEFAULT_CATEGORIES = DEFAULT_APP_CATEGORIES
 
 
-# Default category keywords (used if not configured)
-DEFAULT_CATEGORIES = {
-    "DEV": [
-        "code", "terminal", "iterm", "cursor", "intellij", "pycharm", "vim", 
-        "neovim", "bash", "powershell", "git", "vscode", "android studio", 
-        "xcode", "visual studio", "sublime", "atom", "emacs", "nvim",
-        "cmd", "command prompt", "windows terminal", "warp", "hyper",
-        "rider", "webstorm", "phpstorm", "goland", "clion", "datagrip",
-        "windsurf", "zed", "fleet"
-    ],
-    "BIZ": [
-        "mail", "gmail", "outlook", "slack", "teams", "zoom", "discord",
-        "thunderbird", "chatwork", "line", "messenger", "skype", "webex",
-        "meet", "hangouts"
-    ],
-    "DOC": [
-        "word", "powerpoint", "notion", "obsidian", "memo", "note", "writer",
-        "text", "evernote", "onenote", "typora", "bear", "ulysses", "scrivener",
-        "メモ", "notepad", "textedit", "gedit", "kate", "pages", "docs"
-    ],
-    "STD": []
-}
 
-# Default category prompts
-DEFAULT_CATEGORY_PROMPTS = {
-    "DEV": """あなたは熟練のプログラマです。
+import re
 
-【現在の状況】
-ユーザーは現在、開発環境「{window_title}」にテキストを入力しようとしています。
-
-【指示】
-- 入力テキストをコードコメント、コミットメッセージ、または変数名として適切な形式に変換してください
-- 変数名を示唆された場合は `snake_case` または `camelCase` を適用してください
-- ライブラリ名・コマンド名・専門用語は正しい英単語スペルに修正してください
-- 出力は極めて簡潔にしてください
-
-【絶対ルール】
-1. フィラー（えー、あー、そのー）は完全に削除する
-2. IT用語・固有名詞はカタカナではなく英単語で出力する
-3. 余計な返事や挨拶は書かず、修正後のテキストのみを出力する""",
-
-    "BIZ": """あなたは優秀なビジネス秘書です。
-
-【現在の状況】
-ユーザーは現在、ビジネスツール「{window_title}」にテキストを入力しようとしています。
-
-【指示】
-- 口語体を、相手に失礼のない丁寧な「ビジネス敬語（です・ます調）」に変換してください
-- メールやチャットとして適切な形式に整えてください
-- 文脈に応じて適切な改行を入れてください
-
-【絶対ルール】
-1. フィラー（えー、あー、そのー）は完全に削除する
-2. IT用語・固有名詞はカタカナではなく英単語で出力する
-3. 余計な返事や挨拶は書かず、修正後のテキストのみを出力する""",
-
-    "DOC": """あなたはプロのライター・編集者です。
-
-【現在の状況】
-ユーザーは現在、文書作成ツール「{window_title}」にテキストを入力しようとしています。
-
-【指示】
-- 論理構成を整え、読みやすい「書き言葉」に変換してください
-- 必要であればMarkdown形式（箇条書き等）を使用してください
-- 文体（だ・である／です・ます）を入力の雰囲気に合わせて統一してください
-
-【絶対ルール】
-1. フィラー（えー、あー、そのー）は完全に削除する
-2. IT用語・固有名詞はカタカナではなく英単語で出力する
-3. 余計な返事や挨拶は書かず、修正後のテキストのみを出力する""",
-
-    "STD": """あなたは優秀なテクニカルライターAIです。
-
-【現在の状況】
-ユーザーは現在、アプリケーション「{window_title}」にテキストを入力しようとしています。
-
-【指示】
-- フィラー（えー、あー）を完全に除去してください
-- IT用語・固有名詞は英単語化（カタカナ禁止）してください
-- 誤字脱字を修正してください
-- 自然な日本語の文章に整えてください
-
-【絶対ルール】
-1. 「えー」「あー」などのフィラーは跡形もなく削除する
-2. IT用語・ソフトウェア名・コマンド名はカタカナではなく本来の英単語で出力する
-3. 余計な返事や挨拶は書かず、修正後のテキストのみを出力する"""
-}
-
+def _matches_keyword(keyword: str, title_lower: str) -> bool:
+    """
+    キーワードがウィンドウタイトルに含まれるかを判定する。
+    英数字のみで構成されるキーワードの場合は単語境界を考慮し、
+    'meet' が 'meeting' や 'sheet' に誤爆するのを防止する。
+    """
+    kw = keyword.strip().lower()
+    if not kw:
+        return False
+    if re.match(r'^[a-zA-Z0-9_\-]+$', kw):
+        pattern = r'(?<![a-zA-Z0-9])' + re.escape(kw) + r'(?![a-zA-Z0-9])'
+        return bool(re.search(pattern, title_lower))
+    return kw in title_lower
 
 def detect_category(window_title: str, categories: Optional[dict] = None) -> str:
     """
@@ -122,10 +57,11 @@ def detect_category(window_title: str, categories: Optional[dict] = None) -> str
     # Check each category (except STD which is fallback)
     for category_id in ["DEV", "BIZ", "DOC"]:
         keywords = categories.get(category_id, [])
-        if any(kw.lower() in title_lower for kw in keywords):
+        if any(_matches_keyword(kw, title_lower) for kw in keywords):
             return category_id
     
     return "STD"
+
 
 
 def get_category_prompt(category: str, window_title: str = "") -> str:

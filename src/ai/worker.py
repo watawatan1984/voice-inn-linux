@@ -1,35 +1,28 @@
-from PyQt6.QtCore import QObject, pyqtSignal
 import logging
 import traceback
-import io
+from typing import Dict, Any, Optional
+from PyQt6.QtCore import QObject, pyqtSignal
 
-from src.core.config import config_manager
-from src.ai.providers.groq import GroqProvider
-from src.ai.providers.gemini import GeminiProvider
-from src.ai.providers.local import LocalProvider
+from src.ai.factory import get_provider
+from src.ai.providers.base import AIProvider
 
 class AIWorker(QObject):
+    """
+    バックグラウンドスレッドで音声文字起こし処理を実行する QObject ワーカー。
+    """
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
 
-    def __init__(self, provider_name, audio_path, prompts):
+    def __init__(self, provider_name: str, audio_path: str, prompts: Dict[str, Any]):
         super().__init__()
         self.provider_name = provider_name
         self.audio_path = audio_path
         self.prompts = prompts
-        self.provider = None
+        self.provider: Optional[AIProvider] = None
 
     def run(self):
         try:
-            if self.provider_name == "groq":
-                self.provider = GroqProvider()
-            elif self.provider_name == "gemini":
-                self.provider = GeminiProvider()
-            elif self.provider_name == "local":
-                self.provider = LocalProvider()
-            else:
-                raise ValueError(f"Unknown provider: {self.provider_name}")
-
+            self.provider = get_provider(self.provider_name)
             logging.info(f"Starting transcription with {self.provider_name}")
             text = self.provider.transcribe(self.audio_path, self.prompts)
             logging.info(f"Transcription finished: {len(text)} chars")
