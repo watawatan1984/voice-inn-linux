@@ -48,6 +48,6 @@ graph TD
 
 ## 🛠️ 開発者向けクイックリンク
 - [メイン README.md (プロジェクト概要・使い方)](../README.md)
-- [リファクタリング報告書 (リファクタ.md)](../リファクタ.md)
+- [リファクタリング報告書 (issues/refactor.md)](../issues/refactor.md)
 - [イシュー管理サマリー (issues/ISSUE_SUMMARY.md)](../issues/ISSUE_SUMMARY.md)
 - [開発環境セットアップ (SETUP_UV.md)](../SETUP_UV.md)
